@@ -39,8 +39,12 @@ without the CLI.
 
 ## Deploy
 
-`dist/` is the whole site. Copy it to any static host (GitHub Pages,
-Netlify, an S3 bucket, `python3 -m http.server`).
+The site is live at **<https://ajdariarian94.github.io/aember-website/>**.
+`.github/workflows/pages.yml` publishes it on GitHub Pages on every push to
+`main`: unit tests, recorder tests, `npm run build`, then `dist/` goes up.
+
+`dist/` is the whole site, so any other static host works too (Netlify, an
+S3 bucket, `python3 -m http.server` in `dist/`).
 
 ## Install page
 

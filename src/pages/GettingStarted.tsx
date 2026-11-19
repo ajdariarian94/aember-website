@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export function GettingStarted() {
   return (
     <section>
@@ -23,12 +25,19 @@ aember app launch --headless --timeout 60   # boot in QEMU, console in the termi
         kernel: <code>aember app launch --chroot</code>. For another architecture add{" "}
         <code>--architecture aarch64-poky-linux</code> to each command.
       </p>
-      <h2>Raspberry Pi 4</h2>
+      <h2>Raspberry Pi 4 and PCs</h2>
+      <p>
+        Only want to try it? <Link to="/install">Install</Link> has ready images for
+        Raspberry Pi Imager and balenaEtcher. From your own build:
+      </p>
       <pre>
         <code>{`aember app build --architecture aarch64-poky-linux
 aember app pack --architecture aarch64-poky-linux
-aember rpi image
-aember rpi flash --device /dev/sdX`}</code>
+aember rpi image                      # Raspberry Pi 4 SD card image
+aember rpi flash --device /dev/sdX
+
+aember usb image                      # x86-64 PC USB stick image (UEFI)
+aember usb flash --device /dev/sdX`}</code>
       </pre>
       <h2>Your own service</h2>
       <pre>

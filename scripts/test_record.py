@@ -50,7 +50,9 @@ class HeartbeatParserTest(unittest.TestCase):
     def test_network_not_reported_and_offline(self):
         p = HeartbeatParser()
         p.feed(SEP)
-        p.feed("[aember-monitor]   Network      │ not reported (no aember network service)\n")
+        p.feed(
+            "[aember-monitor]   Network      │ not reported (no aember network service)\n"
+        )
         self.assertIsNone(p.feed(SEP)[1]["network"])
         p.feed(SEP)
         p.feed("[aember-monitor]   Network      │ OFFLINE │ iface= │ rtt=-1ms │ ip=\n")

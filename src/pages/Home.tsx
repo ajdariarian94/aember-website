@@ -13,6 +13,9 @@ export function Home() {
         <Link className="button primary" to="/demo">
           Watch it boot
         </Link>
+        <Link className="button" to="/install">
+          Install on a Pi or PC
+        </Link>
         <Link className="button" to="/getting-started">
           Get started
         </Link>

@@ -1,11 +1,28 @@
 import { expect, test } from "@playwright/test";
 
 // Against the production build (vite preview): the real xterm.js renders.
+// The Install page asks GitHub's API for the latest release: answered here.
+const RELEASE = {
+  tag_name: "v9.9.9",
+  html_url: "https://github.com/ajdariarian94/aember/releases/tag/v9.9.9",
+  assets: [
+    { name: "aember-rpi4-v9.9.9.img.xz", browser_download_url: "https://example.invalid/rpi.img.xz", size: 150e6 },
+    { name: "aember-x64-usb-v9.9.9.img.xz", browser_download_url: "https://example.invalid/usb.img.xz", size: 160e6 },
+    { name: "aember-rpi-imager.json", browser_download_url: "https://example.invalid/imager.json", size: 900 },
+  ],
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.route("https://api.github.com/**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(RELEASE) }),
+  );
+});
+
 test("every page loads without errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  for (const path of ["", "architecture", "features", "hardware", "getting-started"]) {
+  for (const path of ["", "architecture", "features", "hardware", "getting-started", "install", "configure"]) {
     await page.goto(`/#/${path}`);
     await expect(page.locator("h1")).toBeVisible();
   }
@@ -33,4 +50,32 @@ test("the demo plays: console text and a live dashboard", async ({ page }) => {
   await page.waitForTimeout(1500);
   expect(await pos.textContent()).not.toBe(first);
   expect(errors).toEqual([]);
+});
+
+test("install: Imager list, Etcher downloads, developer commands", async ({ page }) => {
+  await page.goto("/#/install");
+  await expect(page.getByTestId("release-status")).toContainText("v9.9.9");
+  await expect(page.getByTestId("download-rpi")).toHaveAttribute("href", "https://example.invalid/rpi.img.xz");
+  await expect(page.getByTestId("download-usb")).toHaveAttribute("href", "https://example.invalid/usb.img.xz");
+  await expect(page.getByText("rpi-imager --repo https://github.com/")).toBeVisible();
+  await expect(page.getByText("UEFI mode with Secure Boot off")).toBeVisible();
+  // fits a phone: no horizontal page scroll
+  await page.setViewportSize({ width: 375, height: 800 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("configure: choices change the generated files", async ({ page }) => {
+  await page.goto("/#/configure");
+  await expect(page.getByRole("note")).toContainText("Preview");
+  const services = page.getByTestId("services-json");
+  await expect(services).toContainText('"aember-netd"');
+  await page.getByRole("checkbox", { name: /^aember-containerd/ }).uncheck();
+  await expect(page.getByTestId("no-containers")).toBeVisible();
+  await expect(services).not.toContainText("aember-containerd");
+  await page.getByLabel("Watchdog seconds").fill("0");
+  await expect(page.getByText("aember.watchdog=0")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download services.json" }).click();
+  expect((await download).suggestedFilename()).toBe("services.json");
 });

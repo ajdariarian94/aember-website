@@ -1,0 +1,69 @@
+{
+    "name": "aember-website-dev",
+
+    // ---------------------------------------------------------------------------
+    // Image source — toggle between prebuilt and local build:
+    //
+    // OPTION A: Pull prebuilt image from GitHub Container Registry
+    // "image": "ghcr.io/ajdariarian94/aember-website-dev:latest",
+    //
+    // OPTION B: Build from Dockerfile (when updating tools/dependencies)
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    // ---------------------------------------------------------------------------
+
+    "runArgs": [
+        "--net=host",
+        // Chromium (Playwright) needs more shared memory than Docker's 64 MB.
+        "--ipc=host",
+
+        // No core dumps (a crashing language server once filled the disk)
+        "--ulimit", "core=0",
+
+        // Docker socket: `aember record` runs aember in its own dev container
+        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-e", "DOCKER_HOST=unix:///var/run/docker.sock",
+        "-e", "HOST_ROOT_PATH=${localWorkspaceFolder}",
+        "-e", "DOCKER_GID=${localEnv:DOCKER_GID}",
+
+        "-v", "${env:HOME}/.ssh:/home/dev/.ssh:ro"
+    ],
+    "workspaceFolder": "/aember_ws/aember-website",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/aember_ws/aember-website,type=bind",
+    "remoteUser": "dev",
+    "postStartCommand": "/aember_ws/aember-website/tools/scripts/init.sh",
+    "forwardPorts": [5173, 4173],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "anthropic.claude-code",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "vitest.explorer",
+                "ms-playwright.playwright",
+                "ms-azuretools.vscode-docker",
+                "github.vscode-pull-request-github",
+                "pkief.material-icon-theme"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "python.languageServer": "Pylance",
+                "python.analysis.exclude": [
+                    "**/node_modules/**",
+                    "**/dist/**",
+                    "**/.git/**"
+                ],
+                "files.watcherExclude": {
+                    "**/node_modules/**": true,
+                    "**/dist/**": true
+                },
+                "typescript.tsdk": "node_modules/typescript/lib",
+                "workbench.iconTheme": "material-icon-theme"
+            }
+        }
+    }
+}

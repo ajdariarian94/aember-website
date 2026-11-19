@@ -69,7 +69,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; }
-.card h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.card h3 { margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 650; }
 .card p { margin: 0; }
 
 table { border-collapse: collapse; width: 100%; }
@@ -102,3 +102,25 @@ th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--borde
 .badge-warn { color: var(--warn); }
 .badge-bad { color: var(--bad); }
 .badge-idle { color: var(--muted); }
+
+.notice { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 0.6rem 0.9rem; }
+.command { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.5rem 0 1rem; }
+.command pre { flex: 1 1 auto; min-width: 0; margin: 0; }
+.command .copy { flex: none; padding: 0.2rem 0.6rem; font-size: 0.85rem; margin-top: 0.6rem; }
+.card ol { margin: 0.4rem 0 0.6rem; padding-left: 1.3rem; }
+.card li { margin: 0.3rem 0; }
+.wrap { overflow-wrap: anywhere; }
+.config-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); margin-top: 1rem; }
+@media (max-width: 860px) { .config-grid { grid-template-columns: minmax(0, 1fr); } }
+.config-form { display: grid; gap: 0.9rem; align-content: start; }
+.config-form fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 0; padding: 0.5rem 0.8rem 0.7rem; display: grid; gap: 0.5rem; }
+.config-form fieldset:disabled { opacity: 0.55; }
+.config-form legend { font-weight: 600; padding: 0 0.3rem; }
+.option { display: flex; gap: 0.6rem; align-items: flex-start; }
+.option input[type="checkbox"] { margin-top: 0.35rem; }
+.option input[type="number"] { width: 5.5rem; font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.option.planned { color: var(--muted); }
+.option .badge { margin-left: 0.5rem; }
+.config-output h2 { margin-top: 1.2rem; font-size: 1.15rem; }
+.config-output pre { max-height: 360px; }
+.notes { color: var(--warn); margin: 0; padding-left: 1.2rem; }

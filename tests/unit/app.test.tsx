@@ -16,6 +16,12 @@ function renderAt(path: string) {
 }
 
 describe("pages", () => {
+  // The Install page asks GitHub for the latest release: never the network here.
+  beforeEach(() => {
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 404, json: async () => ({}) }));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
   it.each(PAGES.filter((p) => p.path !== "/demo"))("$path renders", ({ path }) => {
     renderAt(path);
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();

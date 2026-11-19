@@ -1,10 +1,12 @@
 import { lazy, Suspense } from "react";
 import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { Architecture } from "./pages/Architecture";
+import { Configure } from "./pages/Configure";
 import { Features } from "./pages/Features";
 import { GettingStarted } from "./pages/GettingStarted";
 import { Hardware } from "./pages/Hardware";
 import { Home } from "./pages/Home";
+import { Install } from "./pages/Install";
 
 /** React Router v7 behaviour, opted into now. */
 export const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true };
@@ -18,6 +20,8 @@ export const PAGES = [
   { path: "/features", label: "Features", element: <Features /> },
   { path: "/hardware", label: "Hardware", element: <Hardware /> },
   { path: "/getting-started", label: "Get started", element: <GettingStarted /> },
+  { path: "/install", label: "Install", element: <Install /> },
+  { path: "/configure", label: "Configure", element: <Configure /> },
   { path: "/demo", label: "Demo", element: <Demo /> },
 ];
 

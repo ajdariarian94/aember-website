@@ -101,9 +101,7 @@ class HeartbeatParser:
             self._block["network"] = None
         elif m := _SERVICE.search(plain):
             name, state, kind = m.groups()
-            self._block["services"].append(
-                {"name": name, "state": state, "type": kind}
-            )
+            self._block["services"].append({"name": name, "state": state, "type": kind})
         return None
 
 

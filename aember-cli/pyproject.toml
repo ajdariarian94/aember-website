@@ -1,0 +1,16 @@
+[project]
+name = "aember-website-cli"
+version = "0.1.0"
+dependencies = ["typer", "rich"]
+
+[project.scripts]
+aember = "aember.cli.app:aember"
+
+[tool.setuptools.packages.find]
+include = ["aember*"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.black]
+line-length = 88

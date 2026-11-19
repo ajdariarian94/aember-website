@@ -42,6 +42,7 @@ without the CLI.
 The site is live at **<https://ajdariarian94.github.io/aember-website/>**.
 `.github/workflows/pages.yml` publishes it on GitHub Pages on every push to
 `main`: unit tests, recorder tests, `npm run build`, then `dist/` goes up.
+Pull requests get the same tests and build, without the deploy.
 
 `dist/` is the whole site, so any other static host works too (Netlify, an
 S3 bucket, `python3 -m http.server` in `dist/`).

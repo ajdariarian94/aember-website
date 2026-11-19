@@ -25,8 +25,9 @@ Live at <https://ajdariarian94.github.io/aember-website/>: merging to `main`
 deploys it (`.github/workflows/pages.yml`: `npm ci`, Vitest, the recorder
 tests, `npm run build`, upload `dist/` to GitHub Pages; Pages source =
 "GitHub Actions"). The workflow's Node version and action versions are
-pinned; bump them on purpose. Playwright doesn't run there (run
-`aember test --e2e` before merging).
+pinned; bump them on purpose. Pull requests run the tests and the build
+without deploying. Playwright doesn't run there (run `aember test --e2e`
+before merging).
 
 ## Layout
 

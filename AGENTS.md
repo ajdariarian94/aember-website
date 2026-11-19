@@ -21,9 +21,17 @@ Repository: <https://github.com/ajdariarian94/aember-website> (public).
 Like the sibling repos: branch off `main` (`fix/<x>`, `enhancement/<x>`,
 `docs/<x>`) and merge through a PR.
 
+Live at <https://ajdariarian94.github.io/aember-website/>: merging to `main`
+deploys it (`.github/workflows/pages.yml`: `npm ci`, Vitest, the recorder
+tests, `npm run build`, upload `dist/` to GitHub Pages; Pages source =
+"GitHub Actions"). The workflow's Node version and action versions are
+pinned; bump them on purpose. Playwright doesn't run there (run
+`aember test --e2e` before merging).
+
 ## Layout
 
 ```
+.github/workflows/      pages.yml: build + deploy to GitHub Pages on push to main
 .devcontainer/          Dockerfile (Playwright image: Node 22 + Chromium, + Python,
                         Docker CLI, /venv with the aember CLI), devcontainer.json
 aember-cli/             the `aember` CLI (Python, Typer): cli/, core/, steps/, config/,

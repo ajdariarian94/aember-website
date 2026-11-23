@@ -28,7 +28,8 @@ export interface ServiceOption {
   id: string;
   label: string;
   description: string;
-  status: "available" | "planned";
+  /** "manual": aember has it, but it needs more than this page writes. */
+  status: "available" | "manual";
   /** Another service of this kind replaces it (radio-like). */
   group?: "network";
   entry?: Record<string, unknown>;
@@ -116,8 +117,9 @@ export const SERVICES: ServiceOption[] = [
   {
     id: "connman",
     label: "ConnMan",
-    description: "Network with Wi-Fi (ConnMan + wpa_supplicant), instead of aember-netd",
-    status: "planned",
+    description:
+      "Network with Wi-Fi (ConnMan + wpa_supplicant + D-Bus) instead of aember-netd: the connman and wifi packages, set up as in aember's doc/packages.md",
+    status: "manual",
     group: "network",
   },
   {

@@ -37,7 +37,17 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: "Observable",
     body:
-      "Every second PID 1 writes a heartbeat (its memory and threads, the network, every service and container) to the console and to /var/log/aember-monitor.json, which containers can read.",
+      "Every second PID 1 writes a heartbeat (its memory and threads, the network, every service and container) to the console and to /var/log/aember-status.json, which containers can read (aember-stats serves it with CPU, memory and temperatures; aember-monitor draws it on a screen).",
+  },
+  {
+    title: "Only what you list",
+    body:
+      "An image holds the services in services.json, the containers in containers.json and the opt-in packages in packages.json, nothing more. Prebuilt packages: Dropbear SSH, ext4 tools, a Wi-Fi client (WPA3) and access point, and ConnMan.",
+  },
+  {
+    title: "Fleet updates",
+    body:
+      "aember-auth gives each device an Ed25519 identity that never leaves it; aember-fleet's agent installs the signed container releases a self-hosted fleet server assigns, checks they stay up, and rolls back the ones that don't.",
   },
 ];
 

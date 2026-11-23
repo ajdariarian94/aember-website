@@ -65,7 +65,7 @@ Without a published image the page says how to build one (`aember rpi image`,
 
 `/configure` picks the target (Raspberry Pi 4, x86-64 USB stick, QEMU), the
 services (aember-netd, aember-containerd, the demo service; ConnMan is listed
-as planned), the containers and the boot options (debug shell, watchdog), and
+but set up by hand, see aember's doc/packages.md), the containers and the boot options (debug shell, watchdog), and
 shows the resulting `services.json`, `containers.json` and kernel arguments,
 in aember's own formats. Nothing builds images from it yet.
 

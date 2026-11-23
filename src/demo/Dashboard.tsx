@@ -37,7 +37,7 @@ function ServiceList({ title, items }: { title: string; items: ServiceStatus[] }
   );
 }
 
-/** PID 1's heartbeat as a dashboard (what /var/log/aember-monitor.json holds). */
+/** PID 1's heartbeat as a dashboard (what /var/log/aember-status.json holds). */
 export function Dashboard({ heartbeat }: { heartbeat: Heartbeat | null }) {
   if (!heartbeat) {
     return (

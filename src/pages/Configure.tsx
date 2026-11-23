@@ -64,16 +64,16 @@ export function Configure() {
           <fieldset>
             <legend>Services</legend>
             {SERVICES.map((s) => (
-              <label key={s.id} className={s.status === "planned" ? "option planned" : "option"}>
+              <label key={s.id} className={s.status === "manual" ? "option manual" : "option"}>
                 <input
                   type="checkbox"
                   checked={s.status === "available" && sel.services.includes(s.id)}
-                  disabled={s.status === "planned"}
+                  disabled={s.status === "manual"}
                   onChange={() => toggle("services", s.id)}
                 />
                 <span>
                   <strong>{s.label}</strong>
-                  {s.status === "planned" && <span className="badge badge-idle">planned</span>}
+                  {s.status === "manual" && <span className="badge badge-idle">set up by hand</span>}
                   <br />
                   <span className="muted small">{s.description}</span>
                 </span>

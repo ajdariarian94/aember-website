@@ -35,8 +35,8 @@ describe("configurator", () => {
     expect(out.notes.join(" ")).toMatch(/need aember-containerd/);
   });
 
-  it("planned services are never written", () => {
-    expect(SERVICES.find((s) => s.id === "connman")?.status).toBe("planned");
+  it("manual services are never written", () => {
+    expect(SERVICES.find((s) => s.id === "connman")?.status).toBe("manual");
     const out = generate({ ...defaultSelection(), services: ["connman", "aember-netd"] });
     expect(names(out.servicesJson)).toEqual(["aember-netd"]);
   });

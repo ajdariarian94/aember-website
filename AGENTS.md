@@ -127,8 +127,10 @@ aember lint [--fix] | clean [--all]
   `/var/lib/aember`). When aember changes them, update the catalogue and the
   tests.
 - `generate()` rules: containerd depends on aember-netd only when netd is
-  selected; no containerd → no containers.json; `status: "planned"`
-  services (ConnMan) are shown disabled and never written; kernel args:
+  selected; no containerd → no containers.json; `status: "manual"`
+  services (ConnMan: an aember package that needs D-Bus, wpa_supplicant and
+  its own config files) are shown disabled ("set up by hand") and never
+  written; kernel args:
   `aember.shell=1`, `aember.watchdog=<s>` when not the default 15.
 - It is a **preview**: the page says so, and nothing builds images.
 

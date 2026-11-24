@@ -2,11 +2,19 @@
 """
 Record aember sessions for the website's demo page.
 
-Runs a real aember (QEMU headless, or the chroot launcher) with a scripted
-scene, timestamps everything the console prints and writes one JSON file
-per scene into public/recordings/. The heartbeat block PID 1 prints every
-second is not kept as console text: it becomes a "heartbeat" event the
-demo page shows as a dashboard.
+Runs a real aember (QEMU headless) with a scripted scene and records two
+things side by side:
+
+- the serial console, timestamped, as "console" events;
+- the virtual screen (aember-monitor, the Qt status display, draws on the
+  VM's framebuffer): QEMU's `screendump` through a QMP socket once a
+  second, encoded into a video per scene (VP9 WebM, and H.264 MP4 for
+  Safari), plus a "screen" event
+  per frame (its index in the video) so the page shows the right frame
+  at the right time.
+
+Output: public/recordings/<scene>.json, <scene>.webm, <scene>.mp4 and
+index.json.
 
 Run it where the `aember` command works (the aember dev container), e.g.
 
@@ -16,15 +24,18 @@ or from the host through docker:
 
     scripts/record.py --scene boot \
         --command 'docker exec -i -w /aember_ws/aember <container> \
-                   aember app launch --headless --timeout {timeout}'
+                   aember app launch --headless --timeout {timeout} --qmp {qmp}' \
+        --screen-command 'docker exec -i <container> python3 - {qmp}'
 
-Redo the recordings after each aember release (needs `aember app build`
-and `aember app pack` for x64 first). Standard library only.
+Needs ffmpeg (with libvpx-vp9 and libx264) for the videos (`--ffmpeg PATH`). Redo the
+recordings after each aember release (`aember app build` and `aember app
+pack` for x64 first). Standard library only.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 import os
@@ -32,77 +43,145 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-FORMAT = 1
-DEFAULT_COMMAND = "aember app launch --headless --timeout {timeout}"
+FORMAT = 2
+QMP_SOCKET = "/tmp/aember-record-qmp.sock"
+DEFAULT_COMMAND = "aember app launch --headless --timeout {timeout} --qmp {qmp}"
+# Runs GRABBER (fed on stdin) where the QMP socket is.
+DEFAULT_SCREEN_COMMAND = "python3 - {qmp}"
+SCREEN_FPS = 1  # the video plays frame i at [i, i + 1) s; the page seeks
 
-# ---------------------------------------------------------------------------
-# Heartbeat block -> dashboard data
-# ---------------------------------------------------------------------------
-
-_MONITOR = "[aember-monitor]"
-_SEPARATOR = "━━━━"
-_PID1 = re.compile(
-    r"Aember PID1\s+│ pid=(\d+) │ rss=(\d+)kB │ threads=(\d+) │ "
-    r"children=(\d+) │ uptime=(\d+)s"
-)
-_NETWORK = re.compile(
-    r"Network\s+│ (ONLINE|OFFLINE)\s*│ iface=(\S*) │ rtt=(-?\d+)ms │ ip=(\S*)"
-)
-_NO_NETWORK = re.compile(r"Network\s+│ not reported")
-_SERVICE = re.compile(r"├─ (\S+) \[([^\]]+)\] \((\w+)\)")
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
+# ---------------------------------------------------------------------------
+# Screen: a QMP client that prints one base64 PNG per line, once a second
+# ---------------------------------------------------------------------------
 
-class HeartbeatParser:
-    """
-    Feed it console lines; it swallows the [aember-monitor] block and
-    returns a heartbeat dict when the block is complete. Lines that are not
-    part of a block are returned as they are (kind "console").
-    """
+GRABBER = r"""
+import base64, json, os, socket, sys, time
+path, interval = sys.argv[1], float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
+s = socket.socket(socket.AF_UNIX)
+for _ in range(600):  # QEMU creates the socket a moment after it starts
+    try:
+        s.connect(path)
+        break
+    except OSError:
+        time.sleep(0.1)
+else:
+    sys.exit("no QMP socket at " + path)
+f = s.makefile("rw")
 
-    def __init__(self) -> None:
-        self._block: dict | None = None
+def call(cmd, **args):
+    f.write(json.dumps({"execute": cmd, "arguments": args}) + "\n")
+    f.flush()
+    while True:
+        line = f.readline()
+        if not line:
+            raise EOFError
+        reply = json.loads(line)
+        if "return" in reply or "error" in reply:
+            return reply
 
-    def feed(self, line: str) -> tuple[str, object] | None:
-        """("console", text) | ("heartbeat", dict) | None (swallowed)."""
-        plain = _ANSI.sub("", line)
-        if _MONITOR not in plain:
-            return ("console", line)
-        if _SEPARATOR in plain:
-            if self._block is None:
-                self._block = {"pid1": None, "network": None, "services": []}
-                return None
-            block, self._block = self._block, None
-            return ("heartbeat", block)
-        if self._block is None:
-            return None  # a stray monitor line: drop it
-        if m := _PID1.search(plain):
-            pid, rss, threads, children, uptime = map(int, m.groups())
-            self._block["pid1"] = {
-                "pid": pid,
-                "rss_kb": rss,
-                "threads": threads,
-                "children": children,
-                "uptime_s": uptime,
-            }
-        elif m := _NETWORK.search(plain):
-            self._block["network"] = {
-                "online": m.group(1) == "ONLINE",
-                "iface": m.group(2),
-                "rtt_ms": int(m.group(3)),
-                "ip": m.group(4),
-            }
-        elif _NO_NETWORK.search(plain):
-            self._block["network"] = None
-        elif m := _SERVICE.search(plain):
-            name, state, kind = m.groups()
-            self._block["services"].append({"name": name, "state": state, "type": kind})
-        return None
+png = "/tmp/aember-record-%d.png" % os.getpid()
+try:
+    f.readline()  # greeting
+    call("qmp_capabilities")
+    next_at = time.monotonic()
+    while True:
+        if "return" in call("screendump", filename=png, format="png"):
+            with open(png, "rb") as img:
+                print(base64.b64encode(img.read()).decode(), flush=True)
+        next_at += interval
+        time.sleep(max(0.0, next_at - time.monotonic()))
+except (EOFError, OSError, ValueError):
+    pass  # QEMU is gone: the run ended
+finally:
+    if os.path.exists(png):
+        os.remove(png)
+"""
+
+
+@dataclass
+class Screen:
+    """The frames of one run: (time in ms, PNG bytes)."""
+
+    frames: list[tuple[int, bytes]] = field(default_factory=list)
+
+    def add_line(self, t_ms: int, line: str) -> None:
+        line = line.strip()
+        if not line:
+            return
+        try:
+            png = base64.b64decode(line, validate=True)
+        except ValueError:
+            return
+        if png.startswith(b"\x89PNG"):
+            self.frames.append((t_ms, png))
+
+    def drop_before_final_mode(self) -> None:
+        """
+        Drop the leading frames in another size than the last one: QEMU's
+        "Display output is not active" (640x480) until the kernel sets the
+        framebuffer's mode. A video has one size; the page shows a dark
+        screen until the first frame that is left.
+        """
+        if not self.frames:
+            return
+        final = png_size(self.frames[-1][1])
+        first = next(i for i, (_, p) in enumerate(self.frames) if png_size(p) == final)
+        del self.frames[:first]
+
+    def events(self, until_ms: int) -> list[dict]:
+        """One "screen" event per frame: data = its index in the video."""
+        return [
+            {"t": t, "type": "screen", "data": i}
+            for i, (t, _) in enumerate(self.frames)
+            if t <= until_ms
+        ]
+
+    def encode(self, ffmpeg: str, outs: list[Path], count: int) -> None:
+        """The first @p count frames as videos (by suffix), SCREEN_FPS frames/s."""
+        with tempfile.TemporaryDirectory() as tmp:
+            for i, (_, png) in enumerate(self.frames[:count]):
+                (Path(tmp) / f"{i:05d}.png").write_bytes(png)
+            for out in outs:
+                subprocess.run(
+                    ffmpeg_command(ffmpeg, Path(tmp) / "%05d.png", out),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                )
+
+
+def png_size(png: bytes) -> tuple[int, int]:
+    """Width and height from a PNG's IHDR chunk."""
+    return int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")
+
+
+# Mostly still frames of a dashboard. VP9 plays in Chrome, Firefox and Edge
+# (also builds without H.264, like Playwright's Chromium), H.264 in Safari.
+# A keyframe every 5 frames keeps seeking cheap.
+CODECS = {
+    ".webm": ("-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-row-mt", "1"),
+    ".mp4": (
+        *("-c:v", "libx264", "-preset", "veryslow", "-tune", "stillimage"),
+        *("-crf", "28", "-movflags", "+faststart"),  # index first: early seeks
+    ),
+}
+
+
+def ffmpeg_command(ffmpeg: str, pattern: Path, out: Path) -> list[str]:
+    return [
+        ffmpeg,
+        *("-hide_banner", "-loglevel", "error", "-y"),
+        *("-framerate", str(SCREEN_FPS), "-i", str(pattern)),
+        *CODECS[out.suffix],
+        *("-g", "5", "-pix_fmt", "yuv420p", "-an", str(out)),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -112,12 +191,11 @@ class HeartbeatParser:
 
 @dataclass
 class Capture:
-    """Timestamped console output of one run, split into lines."""
+    """Timestamped console output of one run."""
 
     start: float = field(default_factory=time.monotonic)
     events: list[dict] = field(default_factory=list)
     text: str = ""  # everything so far, for wait_for()
-    _parser: HeartbeatParser = field(default_factory=HeartbeatParser)
     _partial: str = ""
     _partial_since: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -135,9 +213,9 @@ class Capture:
             if not self._partial:
                 self._partial_since = time.monotonic()
             self._partial += chunk
-            while "\n" in self._partial:
-                line, self._partial = self._partial.split("\n", 1)
-                self._emit(line + "\n")
+            if "\n" in self._partial:
+                done, self._partial = self._partial.rsplit("\n", 1)
+                self._emit(done + "\n")
             self._changed.notify_all()
 
     def flush_partial(self, older_than: float = 0.15) -> None:
@@ -147,18 +225,12 @@ class Capture:
                 self._emit(self._partial)
                 self._partial = ""
 
-    def _emit(self, text: str) -> None:
-        out = self._parser.feed(text)
-        if out is None:
-            return
-        kind, data = out
+    def _emit(self, data: str) -> None:
         t = self.now_ms()
-        if kind == "console" and self.events and self.events[-1]["type"] == "console":
-            last = self.events[-1]
-            if t - last["t"] < 20:  # merge bursts: smaller files, same look
-                last["data"] += data
-                return
-        self.events.append({"t": t, "type": kind, "data": data})
+        if self.events and t - self.events[-1]["t"] < 20:
+            self.events[-1]["data"] += data  # merge bursts: smaller files
+            return
+        self.events.append({"t": t, "type": "console", "data": data})
 
     def wait_for(self, pattern: str, timeout: float) -> bool:
         regex = re.compile(pattern)
@@ -170,6 +242,11 @@ class Capture:
                     return False
                 self._changed.wait(left)
         return True
+
+
+def merge(console: list[dict], screen: list[dict]) -> list[dict]:
+    """Both event lists in time order (console first at equal times)."""
+    return sorted(console + screen, key=lambda e: (e["t"], e["type"] != "console"))
 
 
 # ---------------------------------------------------------------------------
@@ -187,27 +264,28 @@ SCENES: dict[str, dict] = {
         "title": "Boot",
         "description": (
             "From the kernel to the initramfs, the switch to the real root, "
-            "PID 1, the network and the containers."
+            "PID 1, the network and the containers; aember-monitor comes up "
+            "on the screen."
         ),
-        "timeout": 45,
-        "steps": [("wait", READY, 40), ("sleep", 20)],
+        "timeout": 50,
+        "steps": [("wait", READY, 40), ("sleep", 25)],
     },
     "kill-service": {
         "title": "A service dies and comes back",
         "description": (
-            "A shell kills the aember-child-demo service; PID 1 notices and "
-            "restarts it after its restart delay, then a container's app is "
-            "killed and containerd restarts the container."
+            "A shell kills aember-netd and the aember-echo container's app; "
+            "PID 1 restarts the service, containerd restarts the container, "
+            "and the screen shows both coming back."
         ),
         "timeout": 75,
         "steps": [
             ("wait", READY, 40),
-            ("sleep", 8),
+            ("sleep", 10),
             ("open_shell",),
             ("sleep", 1),
             (
                 "type_slowly",
-                "kill -9 $(pidof aember-child-demo) "
+                "kill -9 $(pidof aember-netd) "
                 "$(ps | grep '[e]cho-alpine' | awk '{print $1}'); exit\n",
             ),
             ("sleep", 25),
@@ -240,9 +318,28 @@ SCENES: dict[str, dict] = {
 }
 
 
-def run_scene(name: str, command: str, source: str) -> dict:
+def _start_screen(command: str, screen: Screen, capture: Capture):
+    argv = shlex.split(command.format(qmp=QMP_SOCKET)) + [str(1 / SCREEN_FPS)]
+    proc = subprocess.Popen(
+        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True
+    )
+    proc.stdin.write(GRABBER)
+    proc.stdin.close()
+
+    def reader() -> None:
+        for line in proc.stdout:
+            screen.add_line(capture.now_ms(), line)
+
+    thread = threading.Thread(target=reader, daemon=True)
+    thread.start()
+    return proc, thread
+
+
+def run_scene(
+    name: str, command: str, screen_command: str, source: str
+) -> tuple[dict, Screen]:
     scene = SCENES[name]
-    argv = shlex.split(command.format(timeout=scene["timeout"]))
+    argv = shlex.split(command.format(timeout=scene["timeout"], qmp=QMP_SOCKET))
     print(f"[record] {name}: {' '.join(argv)}", file=sys.stderr)
     proc = subprocess.Popen(
         argv,
@@ -251,6 +348,8 @@ def run_scene(name: str, command: str, source: str) -> dict:
         stderr=subprocess.DEVNULL,  # the aember CLI's own log
     )
     capture = Capture()
+    screen = Screen()
+    grabber, grab_thread = _start_screen(screen_command, screen, capture)
 
     def reader() -> None:
         fd = proc.stdout.fileno()
@@ -310,24 +409,35 @@ def run_scene(name: str, command: str, source: str) -> dict:
             proc.kill()
         threads[0].join(timeout=5)
         capture.flush_partial(older_than=0)
+        # The grabber ends when QEMU closes the socket.
+        try:
+            grabber.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            grabber.kill()
+        grab_thread.join(timeout=5)
 
-    events = [
-        e
-        for e in capture.events
-        if e["t"] <= end_ms and (e["type"] != "console" or e["data"])
-    ]
-    if not any(e["type"] == "heartbeat" for e in events):
-        raise RuntimeError(f"{name}: no heartbeat recorded")
-    return {
+    console = [e for e in capture.events if e["t"] <= end_ms and e["data"]]
+    screen.drop_before_final_mode()
+    frames = screen.events(end_ms)
+    if not frames:
+        raise RuntimeError(f"{name}: no screen frames recorded")
+    events = merge(console, frames)
+    rec = {
         "format": FORMAT,
         "scene": name,
         "title": scene["title"],
         "description": scene["description"],
         "recorded": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "source": source,
-        "duration_ms": events[-1]["t"] if events else 0,
+        "duration_ms": events[-1]["t"],
+        "screen": {
+            "sources": [f"{name}{suffix}" for suffix in CODECS],
+            "fps": SCREEN_FPS,
+            "frames": len(frames),
+        },
         "events": events,
     }
+    return rec, screen
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -339,7 +449,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--command",
         default=DEFAULT_COMMAND,
-        help="How to start aember; {timeout} is replaced (default: %(default)s)",
+        help="How to start aember; {timeout} and {qmp} are replaced "
+        "(default: %(default)s)",
+    )
+    ap.add_argument(
+        "--screen-command",
+        default=DEFAULT_SCREEN_COMMAND,
+        help="How to run Python where the QMP socket is (the grabber comes on "
+        "stdin); {qmp} is replaced (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--ffmpeg", default="ffmpeg", help="ffmpeg with libvpx-vp9 and libx264"
     )
     ap.add_argument(
         "--source", default="aember, x64 QEMU", help="Shown with the recording"
@@ -349,12 +469,15 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     names = list(SCENES) if args.scene == "all" else [args.scene]
     for name in names:
-        rec = run_scene(name, args.command, args.source)
+        rec, screen = run_scene(name, args.command, args.screen_command, args.source)
+        videos = [args.out / s for s in rec["screen"]["sources"]]
+        screen.encode(args.ffmpeg, videos, rec["screen"]["frames"])
+        size = sum(v.stat().st_size for v in videos) // 1024
         path = args.out / f"{name}.json"
         path.write_text(json.dumps(rec, ensure_ascii=False, separators=(",", ":")))
-        beats = sum(e["type"] == "heartbeat" for e in rec["events"])
         print(
-            f"[record] {path}: {len(rec['events'])} events, {beats} heartbeats, "
+            f"[record] {path}: {len(rec['events'])} events, "
+            f"{rec['screen']['frames']} frames ({size} KB of video), "
             f"{rec['duration_ms'] / 1000:.1f} s",
             file=sys.stderr,
         )

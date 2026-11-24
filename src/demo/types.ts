@@ -1,44 +1,35 @@
-/** What PID 1's heartbeat says, as scripts/record.py extracts it. */
-export interface Pid1Stats {
-  pid: number;
-  rss_kb: number;
-  threads: number;
-  children: number;
-  uptime_s: number;
-}
-
-export interface NetworkStatus {
-  online: boolean;
-  iface: string;
-  rtt_ms: number;
-  ip: string;
-}
-
-export interface ServiceStatus {
-  name: string;
-  state: string;
-  type: "process" | "container" | string;
-}
-
-export interface Heartbeat {
-  pid1: Pid1Stats | null;
-  /** null: no service reports the network. */
-  network: NetworkStatus | null;
-  services: ServiceStatus[];
+/**
+ * The recorded screen: one video per scene in public/recordings/, in each
+ * of @p sources (WebM VP9 first, then MP4 H.264 for Safari), frame i shown
+ * from i / fps to (i + 1) / fps seconds. The page never plays it; it shows
+ * the frame a "screen" event names.
+ */
+export interface ScreenVideo {
+  sources: string[];
+  fps: number;
+  frames: number;
 }
 
 export type RecordingEvent =
   | { t: number; type: "console"; data: string }
-  | { t: number; type: "heartbeat"; data: Heartbeat };
+  /** data: the frame index in the screen video. */
+  | { t: number; type: "screen"; data: number };
 
-/** One recorded scene (public/recordings/<scene>.json, format 1). */
+/** One recorded scene (public/recordings/<scene>.json, format 2). */
 export interface Recording {
-  format: 1;
+  format: 2;
   scene: string;
   title: string;
   description: string;
   recorded: string;
   source: string;
   duration_ms: number;
+  /** Absent: the recording has no screen. */
+  screen?: ScreenVideo;
   events: RecordingEvent[];
+}
+
+/** Where frame @p frame sits in the video: its middle, so seeking is exact. */
+export function frameTime(screen: ScreenVideo, frame: number): number {
+  return (frame + 0.5) / screen.fps;
 }

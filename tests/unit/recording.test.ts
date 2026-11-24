@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadRecording, loadSceneIndex, validateRecording } from "../../src/demo/recording";
@@ -8,16 +8,17 @@ const DIR = join(__dirname, "../../public/recordings");
 
 describe("validateRecording", () => {
   const ok: Recording = {
-    format: 1,
+    format: 2,
     scene: "s",
     title: "t",
     description: "d",
     recorded: "2026-11-18",
     source: "x",
     duration_ms: 1,
+    screen: { sources: ["s.webm", "s.mp4"], fps: 1, frames: 1 },
     events: [
       { t: 0, type: "console", data: "x" },
-      { t: 1, type: "heartbeat", data: { pid1: null, network: null, services: [] } },
+      { t: 1, type: "screen", data: 0 },
     ],
   };
   it("accepts a valid recording", () => {
@@ -25,7 +26,7 @@ describe("validateRecording", () => {
   });
   it("reports what is wrong", () => {
     expect(validateRecording(null)).toEqual(["not an object"]);
-    expect(validateRecording({ ...ok, format: 2 })).toContain("unsupported format 2");
+    expect(validateRecording({ ...ok, format: 1 })).toContain("unsupported format 1");
     expect(validateRecording({ ...ok, title: "" })).toContain("missing title");
     expect(
       validateRecording({ ...ok, events: [{ t: 5, type: "console", data: "a" }, { t: 1, type: "console", data: "b" }] }),
@@ -33,9 +34,14 @@ describe("validateRecording", () => {
     expect(validateRecording({ ...ok, events: [{ t: 0, type: "video", data: "" }] })).toContain(
       "event 0: unknown type video",
     );
-    expect(validateRecording({ ...ok, events: [{ t: 0, type: "heartbeat", data: {} }] })).toContain(
-      "event 0: heartbeat without services",
+    expect(validateRecording({ ...ok, events: [{ t: 0, type: "screen", data: 1 }] })).toContain(
+      "event 0: no such screen frame",
     );
+    expect(validateRecording({ ...ok, screen: { sources: ["../x.mp4"], fps: 1, frames: 1 } })).toContain(
+      "bad screen",
+    );
+    const { screen: _none, ...noScreen } = ok;
+    expect(validateRecording({ ...noScreen, events: [{ t: 0, type: "console", data: "x" }] })).toEqual([]);
   });
 });
 
@@ -56,22 +62,25 @@ describe("the recordings shipped in public/recordings", () => {
       .map((e: { data: string }) => e.data)
       .join("");
     expect(text).toContain("Aember Init System started successfully");
-    expect(text).not.toContain("[aember-monitor]"); // heartbeats became events
-    const beats = rec.events.filter((e: { type: string }) => e.type === "heartbeat");
-    expect(beats.length).toBeGreaterThan(5);
-    const last = beats.at(-1).data;
-    expect(last.pid1.pid).toBe(1);
-    expect(last.services.map((s: { name: string }) => s.name)).toContain("aember-netd");
+    // the screen: a video next to the file, every frame in order
+    const base = file.replace(".json", "");
+    expect(rec.screen.sources).toEqual([`${base}.webm`, `${base}.mp4`]);
+    for (const v of rec.screen.sources) expect(statSync(join(DIR, v)).size).toBeGreaterThan(10_000);
+    const frames = rec.events
+      .filter((e: { type: string }) => e.type === "screen")
+      .map((e: { data: number }) => e.data);
+    expect(frames.length).toBe(rec.screen.frames);
+    expect(frames).toEqual([...frames.keys()]);
+    expect(frames.length).toBeGreaterThan(20);
   });
 
-  it("kill-service shows the restarts", () => {
+  it("kill-service kills a service and a container, and they come back", () => {
     const rec = JSON.parse(readFileSync(join(DIR, "kill-service.json"), "utf8")) as Recording;
-    const echo = rec.events
-      .filter((e) => e.type === "heartbeat")
-      .map((e) => (e.type === "heartbeat" ? e.data.services.find((s) => s.name === "aember-echo")?.state : ""));
-    const failed = echo.indexOf("failed");
-    expect(failed).toBeGreaterThan(-1);
-    expect(echo.slice(failed)).toContain("running"); // came back
+    const text = rec.events.map((e) => (e.type === "console" ? e.data : "")).join("");
+    const died = text.indexOf("Service 'aember-netd': failed -> starting");
+    expect(died).toBeGreaterThan(-1);
+    expect(text.slice(died)).toContain("Service 'aember-netd': starting -> running"); // came back
+    expect(text).toContain("kill -9 $(pidof aember-netd)");
   });
 
   it("debug-shell opens a shell", () => {

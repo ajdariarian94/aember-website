@@ -1,4 +1,4 @@
-import type { Heartbeat, Recording, RecordingEvent } from "./types";
+import type { Recording, RecordingEvent } from "./types";
 
 /** Idle stretches longer than this play back in this time. */
 export const MAX_GAP_MS = 1500;
@@ -6,7 +6,8 @@ export const MAX_GAP_MS = 1500;
 export interface PlayerCallbacks {
   /** Text for the console (ANSI included). */
   onConsole(data: string): void;
-  onHeartbeat(heartbeat: Heartbeat): void;
+  /** The screen video's frame to show now. */
+  onScreen(frame: number): void;
   /** Clear the console: playback starts over or jumps. */
   onReset(): void;
   onProgress?(positionMs: number): void;
@@ -38,7 +39,7 @@ export function timeline(events: RecordingEvent[], maxGap = MAX_GAP_MS): number[
 }
 
 /**
- * Replays a recording: console text and heartbeats at their (shortened)
+ * Replays a recording: console text and screen frames at their (shortened)
  * times, at a chosen speed, with pause and seek.
  */
 export class ReplayPlayer {
@@ -96,23 +97,23 @@ export class ReplayPlayer {
     this.play();
   }
 
-  /** Jump to @p ms: the console is rebuilt up to there, the last heartbeat shown. */
+  /** Jump to @p ms: the console is rebuilt up to there, the last screen frame shown. */
   seek(ms: number): void {
     this.cancel();
     const target = Math.max(0, Math.min(ms, this.duration));
     this.cb.onReset();
     let text = "";
-    let heartbeat: Heartbeat | null = null;
+    let frame: number | null = null;
     let i = 0;
     const events = this.recording.events;
     while (i < events.length && this.times[i] <= target) {
       const e = events[i];
       if (e.type === "console") text += e.data;
-      else heartbeat = e.data;
+      else frame = e.data;
       i++;
     }
     if (text) this.cb.onConsole(text);
-    if (heartbeat) this.cb.onHeartbeat(heartbeat);
+    if (frame !== null) this.cb.onScreen(frame);
     this.next = i;
     this.positionMs = target;
     this.cb.onProgress?.(target);
@@ -152,7 +153,7 @@ export class ReplayPlayer {
     while (this.next < events.length && this.times[this.next] <= now) {
       const e = events[this.next++];
       if (e.type === "console") this.cb.onConsole(e.data);
-      else this.cb.onHeartbeat(e.data);
+      else this.cb.onScreen(e.data);
     }
     this.positionMs = now;
     this.cb.onProgress?.(now);

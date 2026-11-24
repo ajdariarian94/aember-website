@@ -5,9 +5,26 @@ export function validateRecording(value: unknown): string[] {
   const errors: string[] = [];
   if (typeof value !== "object" || value === null) return ["not an object"];
   const r = value as Record<string, unknown>;
-  if (r.format !== 1) errors.push(`unsupported format ${String(r.format)}`);
+  if (r.format !== 2) errors.push(`unsupported format ${String(r.format)}`);
   for (const key of ["scene", "title", "description", "recorded", "source"]) {
     if (typeof r[key] !== "string" || r[key] === "") errors.push(`missing ${key}`);
+  }
+  let frames = 0;
+  if (r.screen !== undefined) {
+    const s = r.screen as Record<string, unknown> | null;
+    if (
+      !s ||
+      !Array.isArray(s.sources) ||
+      s.sources.length === 0 ||
+      !s.sources.every((v) => typeof v === "string" && /^[\w.-]+\.(webm|mp4)$/.test(v)) ||
+      typeof s.fps !== "number" ||
+      !(s.fps > 0) ||
+      typeof s.frames !== "number"
+    ) {
+      errors.push("bad screen");
+    } else {
+      frames = s.frames;
+    }
   }
   if (!Array.isArray(r.events)) return [...errors, "events must be an array"];
   let last = -Infinity;
@@ -21,10 +38,9 @@ export function validateRecording(value: unknown): string[] {
     last = ev.t;
     if (ev.type === "console") {
       if (typeof ev.data !== "string") errors.push(`event ${i}: console data`);
-    } else if (ev.type === "heartbeat") {
-      const hb = ev.data as Record<string, unknown> | null;
-      if (!hb || !Array.isArray(hb.services)) {
-        errors.push(`event ${i}: heartbeat without services`);
+    } else if (ev.type === "screen") {
+      if (!Number.isInteger(ev.data) || (ev.data as number) < 0 || (ev.data as number) >= frames) {
+        errors.push(`event ${i}: no such screen frame`);
       }
     } else {
       errors.push(`event ${i}: unknown type ${String(ev.type)}`);

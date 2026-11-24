@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git python3 python3-venv python3-pip locales gh \
-        ca-certificates sudo vim bash-completion figlet lolcat acl docker.io \
+        ca-certificates sudo vim bash-completion figlet lolcat acl docker.io ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8 \
     && ln -s /usr/games/lolcat /usr/local/bin/lolcat

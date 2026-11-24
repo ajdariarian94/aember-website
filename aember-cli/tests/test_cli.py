@@ -13,7 +13,11 @@ from aember.config import website
 from aember.core.context import Context
 from aember.steps.clean import CleanStep
 from aember.steps.npm.npm import needs_install
-from aember.steps.recording.record import aember_container, docker_command
+from aember.steps.recording.record import (
+    aember_container,
+    docker_command,
+    docker_screen_command,
+)
 from aember.utils.root import find_root
 
 
@@ -64,14 +68,23 @@ class RecordTest(unittest.TestCase):
 
     def test_command_runs_aember_launch_there_with_the_timeout(self):
         cmd = docker_command("dev-aember")
-        argv = shlex.split(cmd.format(timeout=45))  # what record.py does
+        argv = shlex.split(cmd.format(timeout=45, qmp="/tmp/q.sock"))  # as record.py
         self.assertEqual(
             argv[:6],
             ["docker", "exec", "-i", "-w", website.AEMBER_WORKSPACE, "dev-aember"],
         )
         self.assertEqual(argv[6:8], ["bash", "-lc"])
-        self.assertIn("aember app launch --headless --timeout 45", argv[8])
+        self.assertIn(
+            "aember app launch --headless --timeout 45 --qmp /tmp/q.sock", argv[8]
+        )
         self.assertIn("/venv/bin", argv[8])
+
+    def test_screen_grabber_runs_python_in_the_same_container(self):
+        cmd = docker_screen_command("dev-aember").format(qmp="/tmp/q.sock")
+        self.assertEqual(
+            shlex.split(cmd),
+            ["docker", "exec", "-i", "dev-aember", "python3", "-", "/tmp/q.sock"],
+        )
 
 
 class NpmTest(unittest.TestCase):

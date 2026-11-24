@@ -69,13 +69,27 @@ def record(
     command: str = typer.Option(
         None,
         "--command",
-        help="How to start aember ({timeout} is replaced). Default: `aember app "
-        "launch --headless` in the running aember dev container.",
+        help="How to start aember ({timeout} and {qmp} are replaced). Default: "
+        "`aember app launch --headless` in the running aember dev container.",
+    ),
+    screen_command: str = typer.Option(
+        None,
+        "--screen-command",
+        help="How to run Python next to QEMU's QMP socket ({qmp} is replaced). "
+        "Default: `python3 -` in the running aember dev container.",
+    ),
+    ffmpeg: str = typer.Option(
+        "ffmpeg", "--ffmpeg", help="ffmpeg with libx264, for the screen video"
     ),
 ):
     if scene not in SCENES:
         raise typer.BadParameter(f"--scene must be one of {SCENES}")
-    Pipeline([RecordScenes(scene, source, command), NpmScript("test")]).run(Context())
+    Pipeline(
+        [
+            RecordScenes(scene, source, command, screen_command, ffmpeg),
+            NpmScript("test"),
+        ]
+    ).run(Context())
 
 
 def lint(

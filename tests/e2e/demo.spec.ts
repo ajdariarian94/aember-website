@@ -29,21 +29,28 @@ test("every page loads without errors", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("the demo plays: console text and a live dashboard", async ({ page }) => {
+test("the demo plays: console text and the screen video in step", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/#/demo");
   await expect(page.getByRole("tab", { name: "boot" })).toBeVisible();
   const rows = page.locator(".xterm-rows");
   await expect(rows).toContainText("aember", { timeout: 20_000 });
-  await expect(page.getByTestId("service-aember-netd")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("pid1-rss")).toContainText("MB");
+  const video = page.getByTestId("screen").locator("video");
+  await expect(video.locator("source").first()).toHaveAttribute("src", "recordings/boot.webm");
+  await expect(video).not.toHaveClass(/off/, { timeout: 30_000 });
+  // the player moves the video to the frame: it loaded and seeks
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), { timeout: 10_000 })
+    .toBeGreaterThan(1);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true); // never plays by itself
 
   // another scene, at 4x
   await page.getByRole("tab", { name: "kill-service" }).click();
   await page.locator("select").selectOption("4");
   await expect(page.getByRole("heading", { name: "A service dies and comes back" })).toBeVisible();
-  await expect(page.getByTestId("service-aember-echo")).toBeVisible({ timeout: 30_000 });
+  await expect(video.locator("source").first()).toHaveAttribute("src", "recordings/kill-service.webm");
   // the position moves while playing
   const pos = page.getByTestId("position");
   const first = await pos.textContent();
@@ -78,4 +85,14 @@ test("configure: choices change the generated files", async ({ page }) => {
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download services.json" }).click();
   expect((await download).suggestedFilename()).toBe("services.json");
+});
+
+test("every page fits a phone: no horizontal page scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  for (const path of ["", "architecture", "features", "hardware", "getting-started", "install", "configure", "demo"]) {
+    await page.goto(`/#/${path}`);
+    await expect(page.locator("h1")).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, path || "home").toBeLessThanOrEqual(0);
+  }
 });

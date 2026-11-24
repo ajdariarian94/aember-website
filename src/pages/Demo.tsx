@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Dashboard } from "../demo/Dashboard";
 import { ReplayPlayer } from "../demo/player";
 import { loadRecording, loadSceneIndex } from "../demo/recording";
+import { Screen, type ScreenHandle } from "../demo/Screen";
 import { Terminal, type TerminalHandle } from "../demo/Terminal";
-import type { Heartbeat, Recording } from "../demo/types";
+import type { Recording } from "../demo/types";
 
 const SPEEDS = [1, 2, 4];
 
@@ -16,11 +16,11 @@ export function Demo() {
   const [scene, setScene] = useState<string | null>(null);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [heartbeat, setHeartbeat] = useState<Heartbeat | null>(null);
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const terminal = useRef<TerminalHandle>(null);
+  const screen = useRef<ScreenHandle>(null);
   const player = useRef<ReplayPlayer | null>(null);
 
   useEffect(() => {
@@ -48,10 +48,10 @@ export function Demo() {
     if (!recording) return;
     const p = new ReplayPlayer(recording, {
       onConsole: (data) => terminal.current?.write(data),
-      onHeartbeat: setHeartbeat,
+      onScreen: (frame) => screen.current?.show(frame),
       onReset: () => {
         terminal.current?.reset();
-        setHeartbeat(null);
+        screen.current?.show(null);
       },
       onProgress: setPosition,
       onEnd: () => setPlaying(false),
@@ -88,9 +88,10 @@ export function Demo() {
     <section className="demo">
       <h1>Demo</h1>
       <p className="lead">
-        Recorded sessions of a real aember: the serial console on the left, PID 1's
-        heartbeat as a dashboard on the right. Nothing here is simulated; the
-        recordings come from <code>aember app launch</code> runs.
+        Recorded sessions of a real aember in QEMU: the serial console, and next to
+        it the device's screen, where the <code>aember-monitor</code> container shows
+        CPU, memory, network and every service and container. Nothing here is
+        simulated; both come from the same <code>aember app launch</code> run.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -154,7 +155,7 @@ export function Demo() {
       </div>
       <div className="demo-grid">
         <Terminal ref={terminal} />
-        <Dashboard heartbeat={heartbeat} />
+        <Screen ref={screen} screen={recording?.screen} />
       </div>
       {recording && (
         <p className="muted small">

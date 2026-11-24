@@ -10,7 +10,8 @@ appliances): what it is and why, architecture, features, hardware, getting
 started, **install** (Pi 4 SD card and x86-64 USB stick images through
 Raspberry Pi Imager / balenaEtcher), a services **configurator** (preview)
 and a **demo** that replays real recorded aember sessions: the serial
-console in xterm.js next to a dashboard built from PID 1's heartbeat.
+console in xterm.js next to the device's screen (the aember-monitor
+container, from a video recorded in the same run).
 
 A **static** React site: Vite + TypeScript, hash routing, no backend. The
 build (`dist/`) must run from any static host or sub-folder, so keep
@@ -50,17 +51,18 @@ src/install/releases.ts aember's latest GitHub release: image assets, Imager rep
 src/configure/services.ts  configurator data + generate() (services.json,
                         containers.json, kernel args)
 src/components/Command.tsx  a shell command with a copy button
-src/demo/types.ts       Recording format (format 1): console + heartbeat events
+src/demo/types.ts       Recording format (format 2): console + screen events, frameTime()
 src/demo/recording.ts   validateRecording, loadRecording, loadSceneIndex
 src/demo/player.ts      ReplayPlayer, timeline(), MAX_GAP_MS (gap compression)
 src/demo/Terminal.tsx   xterm.js view (@xterm/addon-fit)
-src/demo/Dashboard.tsx  PID 1 stats, network, services/containers from a Heartbeat
+src/demo/Screen.tsx     the screen: a <video> (WebM + MP4 sources) the player seeks
 src/styles.css          the only stylesheet; colors as tokens on :root, dark mode
                         via prefers-color-scheme
-public/recordings/      <scene>.json (boot, kill-service, debug-shell) + index.json
+public/recordings/      <scene>.json + .webm + .mp4 (boot, kill-service, debug-shell),
+                        index.json
 scripts/record.py       records scenes from a real aember run (stdlib Python)
 scripts/test_record.py  its unittest suite
-tests/unit/             Vitest (jsdom): player, recordings, dashboard, pages,
+tests/unit/             Vitest (jsdom): player, recordings, pages (demo with screen),
                         install (release lookup), configure (generator + page)
 tests/e2e/              Playwright against the production build
 ```
@@ -132,29 +134,45 @@ aember lint [--fix] | clean [--all]
   its own config files) are shown disabled ("set up by hand") and never
   written; kernel args:
   `aember.shell=1`, `aember.watchdog=<s>` when not the default 15.
+- aember-monitor without aember-stats gets a note (the screen stays
+  empty). The Pi target's echo container is `alpine-echo` (aember's
+  aarch64 overlay), x64's `aember-echo`.
 - It is a **preview**: the page says so, and nothing builds images.
 
 ## Recordings
 
-- Format (`src/demo/types.ts`, `FORMAT = 1` in `record.py`): `scene`,
-  `title`, `description`, `recorded`, `source`, `duration_ms`, `events`
-  sorted by `t` (ms). Event `console` = raw console text (ANSI kept);
-  event `heartbeat` = `{pid1, network, services}` parsed from PID 1's
-  `[aember-monitor]` block, which is **not** kept as console text.
+- Format (`src/demo/types.ts`, `FORMAT = 2` in `record.py`): `scene`,
+  `title`, `description`, `recorded`, `source`, `duration_ms`, optional
+  `screen` = `{sources: ["<scene>.webm", "<scene>.mp4"], fps, frames}`,
+  `events` sorted by `t` (ms). Event `console` = raw console text (ANSI
+  kept); event `screen` = the index of the screen video's frame shown
+  from then on.
 - The format is shared by `record.py`, `types.ts` and
   `validateRecording`: change all three together (and bump the format if
-  old files would no longer load). `HeartbeatParser` in `record.py`
-  mirrors aember's heartbeat output (`libraries/device-health` in
-  aember); if aember changes that text, update the regexes and their
-  tests.
+  old files would no longer load).
+- The screen: `aember app launch --headless --qmp <socket>` (aember
+  0.14+) gives QEMU a QMP socket; the recorder runs `GRABBER` (a stdlib
+  Python QMP client, fed on stdin) next to it, which prints a base64 PNG
+  of `screendump` once a second. Leading frames in another size than the
+  last one (QEMU's 640x480 "Display output is not active" before the
+  kernel sets the mode) are dropped. ffmpeg encodes the frames at 1
+  frame/s into VP9 WebM (Chrome, Firefox, Edge; Playwright's Chromium has
+  no H.264) and H.264 MP4 (Safari), a keyframe every 5 frames. Both
+  sources, in that order.
+- aember no longer prints a heartbeat on the console (since the
+  aember-stats/monitor split): the screen is what shows the services'
+  states. Don't bring back a console parser for it.
 - Recordings are real runs; never hand-edit or fabricate them. Redo them
   after an aember release with `aember record` (the aember dev container
-  running, x64 built and packed there).
+  running, x64 built and packed there, with aember-stats and
+  aember-monitor in its overlay).
 - The recorder lets each run end by its own `--timeout`; killing the
   client (`docker exec`) leaves QEMU running and holding the disk image,
-  and the next scene fails. `open_shell` presses `d` up to 3 times.
-- After recording, the tests check the files (valid, a real boot,
-  restarts visible, the shell opened). The recorder merges console bursts
+  and the next scene fails. The grabber ends when QEMU closes the socket.
+  `open_shell` presses `d` up to 3 times.
+- After recording, the tests check the files (valid, a real boot, both
+  videos there, one screen event per frame in order, netd killed and
+  running again, the shell opened). The recorder merges console bursts
   (< 20 ms) into one event to keep them small.
 
 ## Player
@@ -163,7 +181,9 @@ aember lint [--fix] | clean [--all]
   one; never use real timers in unit tests). `timeline()` compresses
   pauses longer than `MAX_GAP_MS` (1.5 s) so the demo doesn't sit idle;
   seeking re-renders the console from the start up to the position.
-- The Dashboard shows the last heartbeat at or before the position.
+- The screen shows the last frame at or before the position: `Screen`
+  sets the paused video's `currentTime` to the middle of that frame
+  (`frameTime`), after `loadedmetadata` if the video isn't ready yet.
 
 ## Conventions
 
@@ -194,6 +214,6 @@ aember lint [--fix] | clean [--all]
 - Don't commit `dist/`, `node_modules/`, `test-results/`, caches or
   `tools/scripts/.env` (`.gitignore`).
 - Don't edit `../aember` from here; if the site needs a change there
-  (e.g. heartbeat format, release asset names), say so.
+  (e.g. the `--qmp` option, release asset names), say so.
 - Keep this file and README.md current: update them in the same change
   when something here goes stale.

@@ -8,7 +8,10 @@ export function Architecture() {
       </p>
       <div className="arch" aria-label="aember boot and process tree">
         <div className="arch-row">
-          <div className="box">kernel</div>
+          <div className="box">
+            <strong>kernel</strong>
+            <span>Linux from aember-resources, trimmed for appliances</span>
+          </div>
           <div className="arrow">→</div>
           <div className="box">
             <strong>initramfs /init = aember</strong>
@@ -21,6 +24,7 @@ export function Architecture() {
           </div>
         </div>
         <div className="arch-children">
+          <p className="arch-label">services PID 1 starts (services.json)</p>
           <div className="box">
             <strong>aember-netd</strong>
             <span>interfaces, DHCP with lease renewal, DNS, connectivity</span>
@@ -32,6 +36,21 @@ export function Architecture() {
           <div className="box">
             <strong>your services</strong>
             <span>anything in services.json, with dependencies and restarts</span>
+          </div>
+        </div>
+        <div className="arch-children">
+          <p className="arch-label">containers aember-containerd runs (containers.json)</p>
+          <div className="box">
+            <strong>aember-stats</strong>
+            <span>CPU, memory, network, disk, temperatures and PID 1's status, once a second</span>
+          </div>
+          <div className="box">
+            <strong>aember-monitor</strong>
+            <span>a Qt status display on the screen, fed by aember-stats</span>
+          </div>
+          <div className="box">
+            <strong>your application</strong>
+            <span>a read-only SquashFS image with an overlay, restarted by its policy</span>
           </div>
         </div>
       </div>

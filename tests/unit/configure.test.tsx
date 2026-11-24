@@ -8,13 +8,17 @@ const names = (json: string) => JSON.parse(json).processes.map((p: { name: strin
 describe("configurator", () => {
   it("the default matches the boards' services.json", () => {
     const out = generate(defaultSelection("rpi4"));
-    expect(names(out.servicesJson)).toEqual(["aember-netd", "aember-containerd", "aember-child-demo"]);
+    expect(names(out.servicesJson)).toEqual(["aember-netd", "aember-containerd"]);
     const ctrd = JSON.parse(out.servicesJson).processes[1];
     expect(ctrd.dependencies).toEqual(["aember-netd"]);
     expect(ctrd.stop_timeout_ms).toBe(60000);
     const containers = JSON.parse(out.containersJson!);
     expect(containers.bridges[0].name).toBe("lxcbr0");
-    expect(containers.containers.map((c: { name: string }) => c.name)).toEqual(["alpine-echo"]);
+    expect(containers.containers.map((c: { name: string }) => c.name)).toEqual([
+      "alpine-echo",
+      "aember-stats",
+      "aember-monitor",
+    ]);
     expect(out.kernelArgs).toBe("");
     expect(out.notes).toEqual([]);
   });
@@ -39,6 +43,11 @@ describe("configurator", () => {
     expect(SERVICES.find((s) => s.id === "connman")?.status).toBe("manual");
     const out = generate({ ...defaultSelection(), services: ["connman", "aember-netd"] });
     expect(names(out.servicesJson)).toEqual(["aember-netd"]);
+  });
+
+  it("aember-monitor without aember-stats gets a note", () => {
+    const sel = { ...defaultSelection("x64-usb"), containers: ["aember-monitor"] };
+    expect(generate(sel).notes.join(" ")).toMatch(/without it the screen stays empty/);
   });
 
   it("boot options become kernel arguments", () => {

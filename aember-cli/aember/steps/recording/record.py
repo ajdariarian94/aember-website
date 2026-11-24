@@ -4,7 +4,8 @@
 aember runs where its own toolchain is: the aember dev container. This
 step finds that container (the running one that mounts the aember
 workspace) and lets the recorder start each scene there with
-`docker exec -i`. Inside the aember container itself (where `aember app
+`docker exec -i`, and its screen grabber (Python, on QEMU's QMP socket)
+the same way. Inside the aember container itself (where `aember app
 launch` works directly), use `--command` to run it locally.
 """
 
@@ -58,14 +59,32 @@ def docker_command(container: str, launch: str = website.AEMBER_LAUNCH) -> str:
     )
 
 
+def docker_screen_command(container: str) -> str:
+    """The recorder's --screen-command: Python next to QEMU's QMP socket."""
+    return f"docker exec -i {container} python3 - {{qmp}}"
+
+
 class RecordScenes(Step):
-    def __init__(self, scene: str, source: str, command: str | None) -> None:
+    def __init__(
+        self,
+        scene: str,
+        source: str,
+        command: str | None,
+        screen_command: str | None = None,
+        ffmpeg: str = "ffmpeg",
+    ) -> None:
         self.scene = scene
         self.source = source
         self.command = command
+        self.screen_command = screen_command
+        self.ffmpeg = ffmpeg
 
     def run(self, ctx: Context) -> None:
-        command = self.command or docker_command(find_aember_container())
+        command, screen = self.command, self.screen_command
+        if not command or not screen:
+            container = find_aember_container()
+            command = command or docker_command(container)
+            screen = screen or docker_screen_command(container)
         log.info("Recording %s with: %s", self.scene, command)
         CommandRunner.run(
             [
@@ -77,6 +96,10 @@ class RecordScenes(Step):
                 self.source,
                 "--command",
                 command,
+                "--screen-command",
+                screen,
+                "--ffmpeg",
+                self.ffmpeg,
             ],
             cwd=ctx.root,
         )

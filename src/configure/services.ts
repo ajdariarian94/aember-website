@@ -40,6 +40,12 @@ const container = (
   dir: string,
   image: string,
   args: string[],
+  extra: Record<string, unknown> = {
+    restart_policy: "always",
+    dependencies: [],
+    max_restart_attempts: 5,
+    restart_delay: 5,
+  },
 ): Record<string, unknown> => ({
   name,
   type: "container",
@@ -49,26 +55,44 @@ const container = (
     config_path: `/var/lib/aember/${dir}/lxc.container.conf`,
     args,
   },
+  ...extra,
+});
+
+/** aember-stats and aember-monitor: small, always restarted, quick to stop. */
+const STATUS_CONTAINER = {
+  init: true,
+  stop_timeout: 5,
   restart_policy: "always",
   dependencies: [],
-  max_restart_attempts: 5,
-  restart_delay: 5,
-});
+  max_restart_attempts: 0,
+  restart_delay: 2,
+};
 
 const ECHO_X64: ContainerOption = {
   name: "aember-echo",
   description: "A tiny shell container that prints a line every few seconds",
   entry: container("aember-echo", "aember-echo", "aember-echo", ["/bin/sh", "/echo-alpine.sh"]),
 };
-const MONITOR: ContainerOption = {
-  name: "aember-monitor",
-  description: "Qt dashboard on the screen (framebuffer)",
-  entry: container("aember-monitor", "aember-monitor", "aember-monitor", ["/usr/bin/aember-monitor"]),
-};
 const ECHO_ARM: ContainerOption = {
   name: "alpine-echo",
   description: "A tiny shell container that prints a line every few seconds",
   entry: container("alpine-echo", "alpine", "alpine", ["/bin/sh", "/echo-alpine.sh"]),
+};
+const STATS: ContainerOption = {
+  name: "aember-stats",
+  description: "Collects CPU, memory, network, disk, temperatures and PID 1's status",
+  entry: container("aember-stats", "aember-stats", "aember-stats", ["/usr/bin/aember-stats"], STATUS_CONTAINER),
+};
+const MONITOR: ContainerOption = {
+  name: "aember-monitor",
+  description: "Qt status display on the screen (framebuffer); needs aember-stats",
+  entry: container(
+    "aember-monitor",
+    "aember-monitor",
+    "aember-monitor",
+    ["/usr/bin/aember-monitor"],
+    STATUS_CONTAINER,
+  ),
 };
 
 export const TARGETS: Target[] = [
@@ -77,21 +101,21 @@ export const TARGETS: Target[] = [
     label: "Raspberry Pi 4 (SD card)",
     arch: "aarch64-poky-linux",
     argsWhere: "cmdline.txt on the card's boot partition (one line)",
-    containers: [ECHO_ARM],
+    containers: [ECHO_ARM, STATS, MONITOR],
   },
   {
     id: "x64-usb",
     label: "x86-64 PC (USB stick)",
     arch: "x64-poky-linux",
     argsWhere: "the options line of loader/entries/aember.conf on the stick",
-    containers: [ECHO_X64, MONITOR],
+    containers: [ECHO_X64, STATS, MONITOR],
   },
   {
     id: "qemu-x64",
     label: "QEMU (x86-64)",
     arch: "x64-poky-linux",
     argsWhere: 'aember app launch --append "…"',
-    containers: [ECHO_X64, MONITOR],
+    containers: [ECHO_X64, STATS, MONITOR],
   },
 ];
 
@@ -139,22 +163,6 @@ export const SERVICES: ServiceOption[] = [
       stop_timeout_ms: 60000,
     },
   },
-  {
-    id: "aember-child-demo",
-    label: "aember-child-demo",
-    description: "Example service: a program PID 1 supervises and restarts",
-    status: "available",
-    entry: {
-      name: "aember-child-demo",
-      executable: "/usr/bin/aember-child-demo",
-      args: [],
-      working_directory: "",
-      environment: {},
-      restart_on_failure: true,
-      max_restarts: 3,
-      restart_delay_ms: 6000,
-    },
-  },
 ];
 
 export interface Selection {
@@ -171,7 +179,7 @@ export const DEFAULT_WATCHDOG = 15;
 export function defaultSelection(target: TargetId = "rpi4"): Selection {
   return {
     target,
-    services: ["aember-netd", "aember-containerd", "aember-child-demo"],
+    services: ["aember-netd", "aember-containerd"],
     containers: targetById(target).containers.map((c) => c.name),
     debugShell: false,
     watchdog: DEFAULT_WATCHDOG,
@@ -222,6 +230,9 @@ export function generate(sel: Selection): Generated {
       containers,
     });
     if (containers.length === 0) notes.push("aember-containerd runs, but no container is selected.");
+    if (sel.containers.includes("aember-monitor") && !sel.containers.includes("aember-stats")) {
+      notes.push("aember-monitor shows what aember-stats collects: without it the screen stays empty.");
+    }
   } else if (sel.containers.length > 0) {
     notes.push("Containers need aember-containerd: without it they are not started.");
   }

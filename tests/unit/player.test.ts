@@ -1,16 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { MAX_GAP_MS, ReplayPlayer, timeline } from "../../src/demo/player";
-import type { Heartbeat, Recording, RecordingEvent } from "../../src/demo/types";
-
-const hb = (uptime: number): Heartbeat => ({
-  pid1: { pid: 1, rss_kb: 5000, threads: 6, children: 2, uptime_s: uptime },
-  network: null,
-  services: [],
-});
+import type { Recording, RecordingEvent } from "../../src/demo/types";
 
 function recording(events: RecordingEvent[]): Recording {
   return {
-    format: 1,
+    format: 2,
     scene: "t",
     title: "t",
     description: "t",
@@ -24,9 +18,9 @@ function recording(events: RecordingEvent[]): Recording {
 const EVENTS: RecordingEvent[] = [
   { t: 0, type: "console", data: "a" },
   { t: 100, type: "console", data: "b" },
-  { t: 100, type: "heartbeat", data: hb(1) },
+  { t: 100, type: "screen", data: 1 },
   { t: 10_100, type: "console", data: "c" }, // 10 s idle: shortened
-  { t: 10_300, type: "heartbeat", data: hb(2) },
+  { t: 10_300, type: "screen", data: 2 },
 ];
 
 /** A clock the test advances by hand. */
@@ -63,7 +57,7 @@ function setup(events = EVENTS) {
   const beats: number[] = [];
   const cb = {
     onConsole: (d: string) => out.push(d),
-    onHeartbeat: (h: Heartbeat) => beats.push(h.pid1!.uptime_s),
+    onScreen: (frame: number) => beats.push(frame),
     onReset: vi.fn(() => {
       out.length = 0;
       beats.length = 0;
@@ -131,7 +125,7 @@ describe("ReplayPlayer", () => {
     player.seek(200 + MAX_GAP_MS);
     expect(cb.onReset).toHaveBeenCalled();
     expect(out).toEqual(["abc"]); // one write, not one per event
-    expect(beats).toEqual([1]); // only the last heartbeat matters
+    expect(beats).toEqual([1]); // only the last frame matters
     expect(player.position).toBe(200 + MAX_GAP_MS);
     player.seek(-5);
     expect(player.position).toBe(0);

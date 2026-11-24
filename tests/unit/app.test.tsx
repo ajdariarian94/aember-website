@@ -46,19 +46,22 @@ describe("demo page", () => {
     vi.useRealTimers();
   });
 
-  it("loads the scenes and plays the boot into console and dashboard", async () => {
+  it("loads the scenes and plays the boot into the console and the screen", async () => {
     renderAt("/demo");
     await waitFor(() => expect(screen.getByRole("tab", { name: "boot" })).toBeInTheDocument());
     expect(screen.getByRole("tab", { name: "kill-service" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "Boot" })).toBeInTheDocument());
     const terminal = screen.getByTestId("terminal");
     await waitFor(() => expect(terminal.textContent).toMatch(/Linux version/), { timeout: 5000 });
-    // jump to the end: the dashboard shows the services PID 1 reported
+    const video = screen.getByTestId("screen").querySelector("video")!;
+    const sources = [...video.querySelectorAll("source")].map((s) => s.getAttribute("src"));
+    expect(sources).toEqual(["recordings/boot.webm", "recordings/boot.mp4"]);
+    // jump to the end: the screen shows its last frame
     const slider = screen.getByLabelText("Position") as HTMLInputElement;
     await act(async () => {
       fireEvent.change(slider, { target: { value: slider.max } });
     });
-    await waitFor(() => expect(screen.getByTestId("service-aember-netd")).toBeInTheDocument());
+    await waitFor(() => expect(video).not.toHaveClass("off"));
     expect(terminal.textContent).toContain("Aember Init System started successfully");
   });
 });

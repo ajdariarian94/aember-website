@@ -37,7 +37,7 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: "Observable",
     body:
-      "Every second PID 1 writes a heartbeat (its memory and threads, the network, every service and container) to the console and to /var/log/aember-status.json, which containers can read (aember-stats serves it with CPU, memory and temperatures; aember-monitor draws it on a screen).",
+      "Every second PID 1 writes its status (its memory and threads, the network, every service and container) to /var/log/aember-status.json, which containers can read: aember-stats adds CPU, memory, disk and temperatures, and aember-monitor draws it all on the device's screen (see the demo).",
   },
   {
     title: "Only what you list",

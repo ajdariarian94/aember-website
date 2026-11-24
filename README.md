@@ -5,8 +5,9 @@ robust PID 1 for container appliances: what it is, why, how it is built,
 its features, supported hardware, getting started, **install** (Raspberry
 Pi 4 SD card and x86-64 USB stick, with Raspberry Pi Imager or
 balenaEtcher), a services **configurator** (preview) and a **demo** that
-replays recorded aember sessions: the serial console in xterm.js and
-PID 1's heartbeat as a dashboard.
+replays recorded aember sessions: the serial console in xterm.js next to
+the device's screen, where the aember-monitor container (Qt) shows CPU,
+memory, network and every service and container.
 
 A static React site (Vite + TypeScript, hash routing): no backend, it runs
 from any static host or sub-folder.
@@ -64,18 +65,24 @@ Without a published image the page says how to build one (`aember rpi image`,
 ## Configurator (preview)
 
 `/configure` picks the target (Raspberry Pi 4, x86-64 USB stick, QEMU), the
-services (aember-netd, aember-containerd, the demo service; ConnMan is listed
-but set up by hand, see aember's doc/packages.md), the containers and the boot options (debug shell, watchdog), and
+services (aember-netd, aember-containerd; ConnMan is listed but set up by
+hand, see aember's doc/packages.md), the containers (the echo example,
+aember-stats, aember-monitor) and the boot options (debug shell, watchdog), and
 shows the resulting `services.json`, `containers.json` and kernel arguments,
 in aember's own formats. Nothing builds images from it yet.
 
 ## Recordings
 
 `public/recordings/<scene>.json` are real sessions, recorded by
-`scripts/record.py` from `aember app launch --headless` (QEMU, x64). Each
-holds the console output with timestamps and the heartbeats PID 1 printed,
-turned into dashboard data. Scenes: `boot`, `kill-service` (a service and a
-container's app get killed and come back), `debug-shell`.
+`scripts/record.py` from `aember app launch --headless --qmp <socket>`
+(QEMU, x64). Each holds the console output with timestamps, and the
+screen: QEMU's `screendump` once a second, encoded into `<scene>.webm`
+(VP9) and `<scene>.mp4` (H.264, for Safari), plus one event per frame. The
+page never plays the video; it shows the frame that belongs to the
+console's position, so both stay in step at any speed and after a seek.
+Scenes: `boot`, `kill-service` (aember-netd and a container's app get
+killed and come back), `debug-shell`. The recorder needs ffmpeg (in the
+dev container).
 
 Redo them after each aember release, with the aember dev container running
 (after `aember app build` and `aember app pack` for x64 there):
@@ -85,7 +92,8 @@ aember record --source "aember <version>, x64 QEMU"
 ```
 
 It finds the running aember dev container and starts each scene there with
-`docker exec`; `--scene boot` records one, `--command` runs aember some other
-way. Each run ends by itself (its `--timeout`), so no QEMU is left running
+`docker exec`, and the screen grabber (a small Python QMP client) in the
+same container; `--scene boot` records one, `--command`/`--screen-command`
+run them some other way, `--ffmpeg` picks the ffmpeg. Each run ends by itself (its `--timeout`), so no QEMU is left running
 between scenes. Then the tests check the new recordings (valid, real boot,
-restarts visible, shell opened).
+restarts visible, shell opened, a video for every frame).

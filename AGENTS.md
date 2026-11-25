@@ -23,17 +23,22 @@ Like the sibling repos: branch off `main` (`fix/<x>`, `enhancement/<x>`,
 `docs/<x>`) and merge through a PR.
 
 Live at <https://ajdariarian94.github.io/aember-website/>: merging to `main`
-deploys it (`.github/workflows/pages.yml`: `npm ci`, Vitest, the recorder
-tests, `npm run build`, upload `dist/` to GitHub Pages; Pages source =
-"GitHub Actions"). The workflow's Node version and action versions are
-pinned; bump them on purpose. Pull requests run the tests and the build
-without deploying. Playwright doesn't run there (run `aember test --e2e`
-before merging).
+deploys it (`.github/workflows/pages.yml`: job `build` = `npm ci`, type
+check, Vitest, the recorder tests, `npm run build`; job `e2e` = Playwright
+against the production build in `mcr.microsoft.com/playwright:v1.49.1-noble`
+(keep its tag equal to `@playwright/test` in package.json); job `deploy`
+uploads `dist/` to GitHub Pages only when both pass; Pages source =
+"GitHub Actions"). The workflow's Node version, image and action versions
+are pinned; bump them on purpose. Pull requests run the tests and the build
+without deploying. In CI Playwright has no retries (a flaky test fails the
+run instead of hiding) and a failing run uploads `playwright-report/` and
+`test-results/` (traces) as the `playwright-report` artifact: open it with
+`npx playwright show-report` / `npx playwright show-trace`.
 
 ## Layout
 
 ```
-.github/workflows/      pages.yml: build + deploy to GitHub Pages on push to main
+.github/workflows/      pages.yml: tests + build + e2e, deploy to GitHub Pages on push to main
 .devcontainer/          Dockerfile (Playwright image: Node 22 + Chromium, + Python,
                         Docker CLI, /venv with the aember CLI), devcontainer.json
 aember-cli/             the `aember` CLI (Python, Typer): cli/, core/, steps/, config/,

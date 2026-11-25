@@ -42,8 +42,10 @@ without the CLI.
 
 The site is live at **<https://ajdariarian94.github.io/aember-website/>**.
 `.github/workflows/pages.yml` publishes it on GitHub Pages on every push to
-`main`: unit tests, recorder tests, `npm run build`, then `dist/` goes up.
-Pull requests get the same tests and build, without the deploy.
+`main`: type check, unit tests, recorder tests, `npm run build` and the
+Playwright end-to-end tests (in the official Playwright image); only when
+all of them pass does `dist/` go up. Pull requests run the same checks
+without deploying.
 
 `dist/` is the whole site, so any other static host works too (Netlify, an
 S3 bucket, `python3 -m http.server` in `dist/`).

@@ -1,7 +1,8 @@
 # Builds the site and publishes it on GitHub Pages:
 # https://ajdariarian94.github.io/aember-website/
 # Runs on every push to main (and by hand); pull requests get the tests and
-# the build, without deploying. The unit tests must pass first.
+# the build, without deploying. Deploys only when the unit tests, the type
+# check, the build and the Playwright end-to-end tests all pass.
 name: Pages
 
 on:
@@ -31,6 +32,7 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
       - run: python3 -m unittest discover -s scripts
       - run: npm run build
@@ -39,8 +41,34 @@ jobs:
         with:
           path: dist
 
+  # Playwright against the production build, in the official image of the
+  # pinned @playwright/test version (Chromium and its libraries included).
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.49.1-noble
+      # The runner's user, so the checkout and the report are writable.
+      options: --user 1001 --ipc=host
+    env:
+      HOME: /tmp/home
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
   deploy:
-    needs: build
+    needs: [build, e2e]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     environment:

@@ -67,6 +67,9 @@ public/recordings/      <scene>.json + .webm + .mp4 (boot, kill-service, debug-s
                         index.json
 scripts/record.py       records scenes from a real aember run (stdlib Python)
 scripts/test_record.py  its unittest suite
+scripts/test_properties.py  property tests (Hypothesis, from
+                        scripts/requirements-dev.txt; skipped without it):
+                        any chunking of the console, merge order, frames
 tests/unit/             Vitest (jsdom): player, recordings, pages (demo with screen), Screen,
                         install (release lookup), configure (generator + page)
 tests/e2e/              Playwright against the production build
@@ -202,8 +205,9 @@ aember lint [--fix] | clean [--all]
 - React Router stays on v6 with the v7 future flags (`ROUTER_FUTURE`), so
   tests run without warnings.
 - Every change gets tests: Vitest for logic and components, the
-  Playwright spec when a page's behaviour changes, `test_record.py` for
-  the recorder, `aember-cli/tests` for the CLI. Before calling something
+  Playwright spec when a page's behaviour changes, `test_record.py` (and
+  a property in `test_properties.py` for anything that parses or orders)
+  for the recorder, `aember-cli/tests` for the CLI. Before calling something
   done: `aember lint` and `aember test --e2e` pass, and the demo plays in
   the built site.
 - Regression tests: a test that pins down a fixed bug starts with a

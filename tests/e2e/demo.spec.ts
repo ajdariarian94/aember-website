@@ -87,6 +87,8 @@ test("configure: choices change the generated files", async ({ page }) => {
   expect((await download).suggestedFilename()).toBe("services.json");
 });
 
+// Regression: on a phone inline commands didn't wrap and the nav took two
+// rows; pages scrolled sideways.
 test("every page fits a phone: no horizontal page scroll", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
   for (const path of ["", "architecture", "features", "hardware", "getting-started", "install", "configure", "demo"]) {

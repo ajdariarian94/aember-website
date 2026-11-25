@@ -67,7 +67,7 @@ public/recordings/      <scene>.json + .webm + .mp4 (boot, kill-service, debug-s
                         index.json
 scripts/record.py       records scenes from a real aember run (stdlib Python)
 scripts/test_record.py  its unittest suite
-tests/unit/             Vitest (jsdom): player, recordings, pages (demo with screen),
+tests/unit/             Vitest (jsdom): player, recordings, pages (demo with screen), Screen,
                         install (release lookup), configure (generator + page)
 tests/e2e/              Playwright against the production build
 ```
@@ -195,7 +195,7 @@ aember lint [--fix] | clean [--all]
 - TypeScript strict, function components, named exports. No CSS framework
   and no UI library: plain CSS in `styles.css` with the color tokens
   (light and dark). Layout must work at phone width without horizontal
-  scrolling (the e2e test checks the Install page at 375 px).
+  scrolling (the e2e test checks every page at 375 px).
 - Dependencies are pinned to exact versions in `package.json` (and the
   lockfile). Don't add one without a reason; nothing that needs a server
   at runtime.
@@ -206,6 +206,9 @@ aember lint [--fix] | clean [--all]
   the recorder, `aember-cli/tests` for the CLI. Before calling something
   done: `aember lint` and `aember test --e2e` pass, and the demo plays in
   the built site.
+- Regression tests: a test that pins down a fixed bug starts with a
+  comment `Regression: <the bug>` (`grep -rn "Regression:"` lists them).
+  Every bug fix gets one.
 - Page content describes aember as it is: check claims (commands,
   targets, features) against `../aember` (its README.md, AGENTS.md,
   TODO.md). Don't advertise what TODO.md lists as open (the real Pi 4 and

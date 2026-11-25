@@ -96,6 +96,13 @@ aember lint [--fix] | clean [--all]
   (`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`); `@playwright/test` in
   package.json must stay at the image's version (1.49.1), or the browsers
   won't match. Bump both together (and the image digest).
+- **Dev image**: developers pull `ghcr.io/ajdariarian94/aember-website-dev` and never
+  build it. `.github/workflows/dev-image.yml` publishes it (tags `latest` +
+  `<YYYYMMDD>-<sha7>`) when `.devcontainer/Dockerfile` or what it COPYs
+  changes on main; PRs touching them build only. A change to the Dockerfile's
+  inputs (e.g. a new Python package in `requirements.txt`) reaches developers
+  only after that workflow has run: tell them to `docker pull` and rebuild
+  the container.
 - `--ipc=host` in devcontainer.json: Chromium needs more shared memory than
   Docker's default.
 - `aember record` needs the Docker socket: it finds the running container

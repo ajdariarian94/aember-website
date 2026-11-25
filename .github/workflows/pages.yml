@@ -34,6 +34,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # The recorder's tests; its property tests need Hypothesis.
+      - run: python3 -m pip install --user --break-system-packages -r scripts/requirements-dev.txt
       - run: python3 -m unittest discover -s scripts
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5.0.0

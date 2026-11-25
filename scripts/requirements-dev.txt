@@ -1,0 +1,3 @@
+# Python packages for the recorder's tests (CI installs them; record.py
+# itself needs none).
+hypothesis==6.122.3

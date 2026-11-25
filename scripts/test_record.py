@@ -79,6 +79,8 @@ class ScreenTest(unittest.TestCase):
     def test_png_size(self):
         self.assertEqual(png_size(png(640, 480)), (640, 480))
 
+    # Regression: QEMU's 640x480 "Display output is not active" frames came
+    # first and set the video's size; the frames before the last mode go.
     def test_frames_before_the_final_mode_are_dropped(self):
         s = Screen()
         s.frames = [(0, png(640, 480)), (1000, png(640, 480)), (2000, PNG)]
@@ -110,6 +112,8 @@ class ScreenTest(unittest.TestCase):
         webm = " ".join(ffmpeg_command("ff", Path("/f/%05d.png"), Path("/o/b.webm")))
         self.assertIn("-c:v libvpx-vp9", webm)
         self.assertNotIn("libx264", webm)
+        # Regression: an H.264-only video never loaded in Chromium builds without
+        # H.264 (Playwright's); VP9 WebM comes first, MP4 for Safari.
         self.assertEqual(list(CODECS), [".webm", ".mp4"])  # the page's order
 
 

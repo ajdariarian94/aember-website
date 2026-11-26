@@ -139,10 +139,12 @@ aember lint [--fix] | clean [--all]
 
 - `src/configure/services.ts` mirrors aember's overlay files
   (`resources/<arch>/rootfs/etc/aember/services.json` and
-  `containers.json`): the service entries, bridge and container entries
-  must match aember's real ones (key names, timeouts, paths under
-  `/var/lib/aember`). When aember changes them, update the catalogue and the
-  tests.
+  `containers.json`): the service entries and the bridge must match
+  aember's real ones (key names, timeouts). containers.json lists only
+  container names (and dependencies), with `"allow_unsigned": true` like
+  aember's development boards: each container is a `.aember` package with
+  its own settings (aember's doc/aember-format.md). When aember changes
+  them, update the catalogue and the tests.
 - `generate()` rules: containerd depends on aember-netd only when netd is
   selected; no containerd → no containers.json; `status: "manual"`
   services (ConnMan: an aember package that needs D-Bus, wpa_supplicant and

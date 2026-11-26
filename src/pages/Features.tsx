@@ -40,6 +40,10 @@ const FEATURES: { title: string; body: string }[] = [
       "Every second PID 1 writes its status (its memory and threads, the network, every service and container) to /var/log/aember-status.json, which containers can read: aember-stats adds CPU, memory, disk and temperatures, and aember-monitor draws it all on the device's screen (see the demo).",
   },
   {
+    title: "Signed container packages",
+    body: "Each container is one .aember file: image, start settings and LXC config, compressed and signed with Ed25519. The device checks the signature, unpacks it once and keeps the version before for a rollback; containers that don't depend on each other start in parallel.",
+  },
+  {
     title: "Only what you list",
     body:
       "An image holds the services in services.json, the containers in containers.json and the opt-in packages in packages.json, nothing more. Prebuilt packages: Dropbear SSH, ext4 tools, a Wi-Fi client (WPA3) and access point, and ConnMan.",

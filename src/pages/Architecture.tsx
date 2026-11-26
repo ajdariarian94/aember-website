@@ -77,11 +77,17 @@ export function Architecture() {
 
       <h2>Containers</h2>
       <p>
-        aember-containerd runs LXC containers from read-only SquashFS images with
-        an OverlayFS on top. A small init inside each container passes SIGTERM on,
-        so containers stop gracefully; <code>restart_policy</code> (no, on-failure,
-        always) decides what happens when one exits. If containerd itself crashes,
-        the containers keep running and are adopted when it comes back.
+        Each container is one <code>.aember</code> package: its read-only SquashFS
+        image, how to start it (<code>config.json</code>) and its LXC configuration,
+        compressed and signed. aember-containerd installs a package once onto the
+        device's disk (the version before kept for a rollback) and starts the
+        container from there with an OverlayFS on top. <code>containers.json</code>{" "}
+        lists only which containers start and what each needs first: containers
+        that don't depend on each other start at the same time. A small init
+        inside each container passes SIGTERM on, so containers stop gracefully;{" "}
+        <code>restart_policy</code> (no, on-failure, always) decides what happens
+        when one exits. If containerd itself crashes, the containers keep running
+        and are adopted when it comes back.
       </p>
     </section>
   );

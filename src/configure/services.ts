@@ -35,7 +35,6 @@ export interface ServiceOption {
   status: "available" | "manual";
   /** Another service of this kind replaces it (radio-like). */
   group?: "network";
-  entry?: Record<string, unknown>;
 }
 
 const ECHO_X64: ContainerOption = {
@@ -86,17 +85,6 @@ export const SERVICES: ServiceOption[] = [
     description: "Network: interfaces, DHCP (with renewal), DNS, connectivity",
     status: "available",
     group: "network",
-    entry: {
-      name: "aember-netd",
-      description: "Network: interfaces, DHCP, DNS, connectivity (services/netd)",
-      executable: "/usr/bin/aember-netd",
-      ipc: true,
-      ready_timeout_ms: 120000,
-      restart_on_failure: true,
-      max_restarts: 0,
-      restart_delay_ms: 2000,
-      stop_timeout_ms: 10000,
-    },
   },
   {
     id: "connman",
@@ -111,17 +99,6 @@ export const SERVICES: ServiceOption[] = [
     label: "aember-containerd",
     description: "LXC containers from containers.json, their bridges, restarts",
     status: "available",
-    entry: {
-      name: "aember-containerd",
-      description: "LXC containers and their bridges (services/containerd)",
-      executable: "/usr/bin/aember-containerd",
-      ipc: true,
-      ready_timeout_ms: 120000,
-      restart_on_failure: true,
-      max_restarts: 0,
-      restart_delay_ms: 2000,
-      stop_timeout_ms: 60000,
-    },
   },
 ];
 
@@ -163,13 +140,16 @@ export interface Generated {
 export function generate(sel: Selection): Generated {
   const target = targetById(sel.target);
   const chosen = SERVICES.filter(
-    (s) => s.status === "available" && sel.services.includes(s.id) && s.entry,
+    (s) => s.status === "available" && sel.services.includes(s.id),
   );
   const ids = new Set(chosen.map((s) => s.id));
   const notes: string[] = [];
 
-  const processes = chosen.map((s) => {
-    const entry: Record<string, unknown> = { ...s.entry };
+  // Names (and what each needs first) only: each service's settings are its
+  // own folder, /usr/lib/aember/services/<name>/config.json, which aember
+  // installs with the service.
+  const services = chosen.map((s) => {
+    const entry: Record<string, unknown> = { name: s.id };
     // containerd waits for the network only when aember-netd is there.
     if (s.id === "aember-containerd" && ids.has("aember-netd")) {
       entry.dependencies = ["aember-netd"];
@@ -208,7 +188,7 @@ export function generate(sel: Selection): Generated {
   if (wd === 0) notes.push("The hardware watchdog is off: a hung PID 1 is not reset.");
 
   return {
-    servicesJson: pretty({ processes }),
+    servicesJson: pretty({ services }),
     containersJson,
     kernelArgs: args.join(" "),
     notes,

@@ -139,8 +139,10 @@ aember lint [--fix] | clean [--all]
 
 - `src/configure/services.ts` mirrors aember's overlay files
   (`resources/<arch>/rootfs/etc/aember/services.json` and
-  `containers.json`): the service entries and the bridge must match
-  aember's real ones (key names, timeouts). containers.json lists only
+  `containers.json`): services.json lists only service names and
+  dependencies (each service's settings are its folder,
+  `/usr/lib/aember/services/<name>/config.json`, which aember installs);
+  the bridge must match aember's real one. containers.json lists only
   container names (and dependencies), with `"allow_unsigned": true` like
   aember's development boards: each container is a `.aember` package with
   its own settings (aember's doc/aember-format.md). When aember changes

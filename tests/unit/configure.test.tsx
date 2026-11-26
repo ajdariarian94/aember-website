@@ -3,15 +3,16 @@ import { describe, expect, it } from "vitest";
 import { defaultSelection, generate, SERVICES } from "../../src/configure/services";
 import { Configure } from "../../src/pages/Configure";
 
-const names = (json: string) => JSON.parse(json).processes.map((p: { name: string }) => p.name);
+const names = (json: string) => JSON.parse(json).services.map((p: { name: string }) => p.name);
 
 describe("configurator", () => {
   it("the default matches the boards' services.json", () => {
     const out = generate(defaultSelection("rpi4"));
     expect(names(out.servicesJson)).toEqual(["aember-netd", "aember-containerd"]);
-    const ctrd = JSON.parse(out.servicesJson).processes[1];
+    const ctrd = JSON.parse(out.servicesJson).services[1];
     expect(ctrd.dependencies).toEqual(["aember-netd"]);
-    expect(ctrd.stop_timeout_ms).toBe(60000);
+    // Names and dependencies only: the settings are each service's folder.
+    expect(Object.keys(ctrd).sort()).toEqual(["dependencies", "name"]);
     const containers = JSON.parse(out.containersJson!);
     expect(containers.bridges[0].name).toBe("lxcbr0");
     expect(containers.containers.map((c: { name: string }) => c.name)).toEqual([
@@ -26,7 +27,7 @@ describe("configurator", () => {
   it("without aember-netd, containerd no longer depends on it", () => {
     const sel = { ...defaultSelection("x64-usb"), services: ["aember-containerd"] };
     const out = generate(sel);
-    const [ctrd] = JSON.parse(out.servicesJson).processes;
+    const [ctrd] = JSON.parse(out.servicesJson).services;
     expect(ctrd.name).toBe("aember-containerd");
     expect(ctrd.dependencies).toBeUndefined();
     expect(out.notes.join(" ")).toMatch(/No network service/);

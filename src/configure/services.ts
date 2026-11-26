@@ -2,7 +2,8 @@
  * The services configurator (a preview): which services and containers an
  * aember image starts. It writes the same files a board's rootfs overlay
  * has in aember (resources/<arch>/rootfs/etc/aember/services.json and
- * containers.json), and the kernel arguments for the boot options. Nothing
+ * containers.json: which containers start; each one is a .aember package
+ * with its own settings), and the kernel arguments for the boot options. Nothing
  * builds an image from it yet: copy the files into the overlay and run
  * `aember app pack` + `aember rpi image` / `aember usb image`.
  */
@@ -18,10 +19,12 @@ export interface Target {
   containers: ContainerOption[];
 }
 
+/** A container the target's image can start: its .aember package is in
+ * aember's resources for that board (how it starts is in the package's
+ * config.json, not in containers.json). */
 export interface ContainerOption {
   name: string;
   description: string;
-  entry: Record<string, unknown>;
 }
 
 export interface ServiceOption {
@@ -35,64 +38,21 @@ export interface ServiceOption {
   entry?: Record<string, unknown>;
 }
 
-const container = (
-  name: string,
-  dir: string,
-  image: string,
-  args: string[],
-  extra: Record<string, unknown> = {
-    restart_policy: "always",
-    dependencies: [],
-    max_restart_attempts: 5,
-    restart_delay: 5,
-  },
-): Record<string, unknown> => ({
-  name,
-  type: "container",
-  container: {
-    squashfs: `/var/lib/aember/${dir}/${image}.squashfs`,
-    rootfs: `/var/lib/aember/containers/${dir}`,
-    config_path: `/var/lib/aember/${dir}/lxc.container.conf`,
-    args,
-  },
-  ...extra,
-});
-
-/** aember-stats and aember-monitor: small, always restarted, quick to stop. */
-const STATUS_CONTAINER = {
-  init: true,
-  stop_timeout: 5,
-  restart_policy: "always",
-  dependencies: [],
-  max_restart_attempts: 0,
-  restart_delay: 2,
-};
-
 const ECHO_X64: ContainerOption = {
   name: "aember-echo",
   description: "A tiny shell container that prints a line every few seconds",
-  entry: container("aember-echo", "aember-echo", "aember-echo", ["/bin/sh", "/echo-alpine.sh"]),
 };
 const ECHO_ARM: ContainerOption = {
   name: "alpine-echo",
   description: "A tiny shell container that prints a line every few seconds",
-  entry: container("alpine-echo", "alpine", "alpine", ["/bin/sh", "/echo-alpine.sh"]),
 };
 const STATS: ContainerOption = {
   name: "aember-stats",
   description: "Collects CPU, memory, network, disk, temperatures and PID 1's status",
-  entry: container("aember-stats", "aember-stats", "aember-stats", ["/usr/bin/aember-stats"], STATUS_CONTAINER),
 };
 const MONITOR: ContainerOption = {
   name: "aember-monitor",
   description: "Qt status display on the screen (framebuffer); needs aember-stats",
-  entry: container(
-    "aember-monitor",
-    "aember-monitor",
-    "aember-monitor",
-    ["/usr/bin/aember-monitor"],
-    STATUS_CONTAINER,
-  ),
 };
 
 export const TARGETS: Target[] = [
@@ -222,10 +182,14 @@ export function generate(sel: Selection): Generated {
 
   let containersJson: string | null = null;
   if (ids.has("aember-containerd")) {
+    // Names (and what each needs first) only: everything else about a
+    // container is in its .aember package. Containers without dependencies
+    // start at the same time.
     const containers = target.containers
       .filter((c) => sel.containers.includes(c.name))
-      .map((c) => c.entry);
+      .map((c) => ({ name: c.name }));
     containersJson = pretty({
+      allow_unsigned: true,
       bridges: [{ name: "lxcbr0", address: "10.0.3.1/24" }],
       containers,
     });

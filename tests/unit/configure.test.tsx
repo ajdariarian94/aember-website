@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { defaultSelection, generate, SERVICES, TARGETS } from "../../src/configure/services";
+import { defaultSelection, generate, SERVICES } from "../../src/configure/services";
 import { Configure } from "../../src/pages/Configure";
 
 const names = (json: string) => JSON.parse(json).processes.map((p: { name: string }) => p.name);
@@ -59,14 +59,10 @@ describe("configurator", () => {
     expect(off.notes.join(" ")).toMatch(/watchdog is off/);
   });
 
-  it("every target's containers point into /var/lib/aember", () => {
-    for (const t of TARGETS) {
-      for (const c of t.containers) {
-        const ctr = (c.entry as { container: Record<string, string> }).container;
-        expect(ctr.squashfs).toMatch(/^\/var\/lib\/aember\/.+\.squashfs$/);
-        expect(ctr.config_path).toMatch(/lxc\.container\.conf$/);
-      }
-    }
+  it("containers.json lists only names: the rest is in each package", () => {
+    const containers = JSON.parse(generate(defaultSelection("qemu-x64")).containersJson!);
+    expect(containers.allow_unsigned).toBe(true);
+    for (const c of containers.containers) expect(Object.keys(c)).toEqual(["name"]);
   });
 });
 

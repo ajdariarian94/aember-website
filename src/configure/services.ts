@@ -148,14 +148,10 @@ export function generate(sel: Selection): Generated {
   // Names (and what each needs first) only: each service's settings are its
   // own folder, /usr/lib/aember/services/<name>/config.json, which aember
   // installs with the service.
-  const services = chosen.map((s) => {
-    const entry: Record<string, unknown> = { name: s.id };
-    // containerd waits for the network only when aember-netd is there.
-    if (s.id === "aember-containerd" && ids.has("aember-netd")) {
-      entry.dependencies = ["aember-netd"];
-    }
-    return entry;
-  });
+  // containerd starts next to aember-netd: a container that needs the
+  // network says so itself ("services" in containers.json), none of these
+  // do.
+  const services = chosen.map((s) => ({ name: s.id }));
   if (!ids.has("aember-netd")) {
     notes.push("No network service: the device has no network unless the kernel's ip= sets it up.");
   }
@@ -164,7 +160,8 @@ export function generate(sel: Selection): Generated {
   if (ids.has("aember-containerd")) {
     // Names (and what each needs first) only: everything else about a
     // container is in its .aember package. Containers without dependencies
-    // start at the same time.
+    // start at the same time, next to the services (one that needs the
+    // network lists "services": ["aember-netd"]).
     const containers = target.containers
       .filter((c) => sel.containers.includes(c.name))
       .map((c) => ({ name: c.name }));

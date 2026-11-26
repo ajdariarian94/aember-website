@@ -10,9 +10,9 @@ describe("configurator", () => {
     const out = generate(defaultSelection("rpi4"));
     expect(names(out.servicesJson)).toEqual(["aember-netd", "aember-containerd"]);
     const ctrd = JSON.parse(out.servicesJson).services[1];
-    expect(ctrd.dependencies).toEqual(["aember-netd"]);
-    // Names and dependencies only: the settings are each service's folder.
-    expect(Object.keys(ctrd).sort()).toEqual(["dependencies", "name"]);
+    // containerd starts next to aember-netd (no container here needs the
+    // network); names only: the settings are each service's folder.
+    expect(Object.keys(ctrd)).toEqual(["name"]);
     const containers = JSON.parse(out.containersJson!);
     expect(containers.bridges[0].name).toBe("lxcbr0");
     expect(containers.containers.map((c: { name: string }) => c.name)).toEqual([
@@ -24,7 +24,7 @@ describe("configurator", () => {
     expect(out.notes).toEqual([]);
   });
 
-  it("without aember-netd, containerd no longer depends on it", () => {
+  it("without aember-netd, containerd runs alone", () => {
     const sel = { ...defaultSelection("x64-usb"), services: ["aember-containerd"] };
     const out = generate(sel);
     const [ctrd] = JSON.parse(out.servicesJson).services;
